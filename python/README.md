@@ -15,6 +15,7 @@ Please see [releases.yml](https://github.com/infiniflow/infinity/blob/main/.gith
 import infinity
 from infinity.common import LOCAL_HOST
 from infinity.common import ConflictType
+from infinity.common import UnsupportedColumnTypeError
 
 infinity_obj = infinity.connect(LOCAL_HOST)
 db = infinity_obj.get_database("default_db")
@@ -28,6 +29,27 @@ res = table.output(["*"]).match_dense("vec", [3.0] * 5, "float", "ip", 2).to_pl(
 print(res)
 
 ```
+
+# Errors raised by the type-decoder layer
+
+Decoders in ``infinity.remote_thrift.types`` raise a structured exception
+class — :class:`infinity.common.UnsupportedColumnTypeError` (a subclass of
+:class:`infinity.common.InfinityException`) — when a Thrift column or
+element type is not recognized. The exception carries the offending type
+value as ``ttype`` and the human-readable message as ``error_msg``:
+
+```python
+from infinity.common import UnsupportedColumnTypeError
+
+try:
+    parse_some_unknown_type(...)
+except UnsupportedColumnTypeError as exc:
+    print("unsupported type:", exc.ttype, "— message:", exc.error_msg)
+```
+
+A standalone BFloat16 byte-level helper is available at
+``infinity.common.bf16_bytes_to_float32_list`` for callers decoding dense
+bf16 columns by hand.
 
 # For developer
 ```shell
