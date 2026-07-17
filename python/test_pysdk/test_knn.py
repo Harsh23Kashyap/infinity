@@ -1845,7 +1845,7 @@ class TestInfinity:
         table_obj.create_index("idx2",
                                index.IndexInfo("c2",
                                                index.IndexType.BMP,
-                                               {"block_size": "8", "compress_type": "raww"}), ConflictType.Error)
+                                               {"block_size": "8", "compress_type": "raw"}), ConflictType.Error)
 
         table_obj.alter_index("idx1", {"topk": "3"})
 
