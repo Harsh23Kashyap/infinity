@@ -83,7 +83,7 @@ class TestInfinity:
         assert res.error_code == ErrorCode.OK
 
     @pytest.mark.parametrize("block_size", [8, 128])
-    @pytest.mark.parametrize("compress_type", ["compress", "raww"])
+    @pytest.mark.parametrize("compress_type", ["compress", "raw"])
     def test_create_index_BMP(self, block_size, compress_type, suffix):
         db_obj = self.infinity_obj.get_database("default_db")
         res = db_obj.drop_table("test_bmp" + suffix, ConflictType.Ignore)

@@ -131,7 +131,7 @@ func TestCreateIndexBMP(t *testing.T) {
 
 	// Test with different block sizes and compress types
 	blockSizes := []string{"8", "128"}
-	compressTypes := []string{"compress", "raww"}
+	compressTypes := []string{"compress", "raw"}
 
 	for _, blockSize := range blockSizes {
 		for _, compressType := range compressTypes {
