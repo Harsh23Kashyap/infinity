@@ -433,8 +433,8 @@ Status ClusterManager::SyncLogs() {
         size_t follower_count = followers.size();
         size_t learner_count = learners.size();
 
-        if (follower_count != follower_clients.size() && learner_count != learner_clients.size()) {
-            return Status::UnexpectedError("Node info and node client count isn't match");
+        if (follower_count != follower_clients.size() || learner_count != learner_clients.size()) {
+            return Status::UnexpectedError("Node info and node client counts don't match");
         }
 
         // Replicate logs to follower
