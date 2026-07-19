@@ -119,5 +119,21 @@ class InfinityException(Exception):
         self.error_msg = error_msg
 
 
+class UnsupportedColumnTypeError(InfinityException):
+    """Raised when a Thrift column / element type is not supported by a decoder.
+
+    Replaces ad-hoc ``NotImplementedError`` sites in the SDK and embedded
+    decoders. Subclassing ``InfinityException`` keeps the existing error
+    handling model intact: callers that already catch ``InfinityException``
+    (or its base ``Exception``) continue to work.
+    """
+
+    def __init__(self, ttype):
+        self.ttype = ttype
+        super().__init__(
+            error_msg=f"Unsupported column type {ttype!r}",
+        )
+
+
 DEFAULT_MATCH_VECTOR_TOPN = 10
 DEFAULT_MATCH_SPARSE_TOPN = 10

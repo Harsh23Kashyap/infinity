@@ -16,7 +16,8 @@ import struct
 import json
 import numpy as np
 import pandas as pd
-from infinity.common import VEC, SparseVector, InfinityException
+from infinity.common import VEC, SparseVector, InfinityException, UnsupportedColumnTypeError
+from infinity.common.bf16 import bf16_bytes_to_float32_list
 from infinity.remote_thrift.infinity_thrift_rpc.ttypes import (
     ColumnExpr,
     ConstantExpr,
@@ -35,6 +36,14 @@ from datetime import date, time, datetime, timedelta
 from infinity.errors import ErrorCode
 
 import infinity.remote_thrift.infinity_thrift_rpc.ttypes as ttypes
+
+
+def bf16_bytes_to_float32_list(column_vector):  # type: ignore[no-redef]  # re-exported from infinity.common.bf16
+    tmp_u16 = np.frombuffer(column_vector, dtype='<i2')
+    result_arr = np.zeros(2 * len(tmp_u16), dtype='<i2')
+    result_arr[1::2] = tmp_u16
+    view_float32 = result_arr.view('<f4')
+    return list(view_float32)
 
 
 def logic_type_to_dtype(ttype: ttypes.DataType):
@@ -84,15 +93,7 @@ def logic_type_to_dtype(ttype: ttypes.DataType):
         case ttypes.LogicType.Array:
             return object
         case _:
-            raise NotImplementedError(f"Unsupported type {ttype}")
-
-
-def bf16_bytes_to_float32_list(column_vector):
-    tmp_u16 = np.frombuffer(column_vector, dtype='<i2')
-    result_arr = np.zeros(2 * len(tmp_u16), dtype='<i2')
-    result_arr[1::2] = tmp_u16
-    view_float32 = result_arr.view('<f4')
-    return list(view_float32)
+            raise UnsupportedColumnTypeError(ttype)
 
 
 def column_vector_to_list(column_type: ttypes.ColumnType, column_data_type: ttypes.DataType, column_vectors, null_bitmap: list[bool] = None) -> \
@@ -207,8 +208,8 @@ def column_vector_to_list(column_type: ttypes.ColumnType, column_data_type: ttyp
                     result.append([f"\u007b0:0{dimension}b\u007d".format(mid_res_int)[::-1]])
                 return result
             else:
-                raise NotImplementedError(
-                    f"Unsupported type {column_data_type.physical_type.embedding_type.element_type}")
+                raise UnsupportedColumnTypeError(
+                    column_data_type.physical_type.embedding_type.element_type)
         case ttypes.ColumnType.ColumnMultiVector:
             return parse_tensor_bytes(column_data_type, column_vector)
         case ttypes.ColumnType.ColumnTensor:
@@ -230,7 +231,7 @@ def column_vector_to_list(column_type: ttypes.ColumnType, column_data_type: ttyp
         case ttypes.ColumnType.ColumnArray:
             return parse_array_bytes(column_data_type, column_vector)
         case _:
-            raise NotImplementedError(f"Unsupported type {column_type}")
+            raise UnsupportedColumnTypeError(column_type)
 
 
 def parse_date_bytes(column_vector):
@@ -343,7 +344,7 @@ def parse_single_array_bytes(column_data_type: ttypes.DataType, bytes_data, offs
                 case ttypes.ElementType.ElementBFloat16:
                     single_pod_element_size = embedding_dimension * 2
                 case _:
-                    raise NotImplementedError(f"Unsupported type {element_data_type}")
+                    raise UnsupportedColumnTypeError(element_data_type)
         case ttypes.LogicType.Date:
             tmp_column_type = ttypes.ColumnType.ColumnDate
             single_pod_element_size = 4
@@ -374,7 +375,7 @@ def parse_single_array_bytes(column_data_type: ttypes.DataType, bytes_data, offs
         case ttypes.LogicType.Array:
             parse_single_element_func = parse_single_array_bytes
         case _:
-            raise NotImplementedError(f"Unexpected type {element_data_type}")
+            raise UnsupportedColumnTypeError(element_data_type)
     if parse_single_element_func is not None:
         array_data = []
         for _ in range(array_element_cnt):
@@ -484,8 +485,8 @@ def tensor_to_list(column_data_type: ttypes.DataType, binary_data) -> list[list[
         all_list = bf16_bytes_to_float32_list(binary_data)
         return [all_list[i:i + dimension] for i in range(0, len(all_list), dimension)]
     else:
-        raise NotImplementedError(
-            f"Unsupported type {column_data_type.physical_type.embedding_type.element_type}")
+        raise UnsupportedColumnTypeError(
+            column_data_type.physical_type.embedding_type.element_type)
 
 
 def parse_sparse_bytes(column_data_type: ttypes.DataType, column_vector):
@@ -518,7 +519,7 @@ def parse_single_sparse_bytes(column_data_type: ttypes.DataType, column_vector, 
             indices = struct.unpack('<{}q'.format(nnz), column_vector[offset:offset + nnz * 8])
             offset += nnz * 8
         case _:
-            raise NotImplementedError(f"Unsupported type {index_type}")
+            raise UnsupportedColumnTypeError(index_type)
     match element_type:
         case ttypes.ElementType.ElementUInt8:
             values = struct.unpack('<{}B'.format(nnz), column_vector[offset:offset + nnz])
@@ -548,9 +549,9 @@ def parse_single_sparse_bytes(column_data_type: ttypes.DataType, column_vector, 
             values = bf16_bytes_to_float32_list(column_vector[offset:offset + nnz * 2])
             offset += nnz * 2
         case ttypes.ElementType.ElementBit:
-            raise NotImplementedError(f"Unsupported type {element_type}")
+            raise UnsupportedColumnTypeError(element_type)
         case _:
-            raise NotImplementedError(f"Unsupported type {element_type}")
+            raise UnsupportedColumnTypeError(element_type)
     # print("indices: {}, values: {}".format(indices, values))
     return SparseVector(list(indices), list(values)).to_dict(), offset
 
