@@ -368,6 +368,9 @@ public:
 
     [[nodiscard]] const DataType &type() const { return type_; }
 
+    // True if this Value is NULL (no extra info attached).
+    [[nodiscard]] bool IsNull() const { return value_info_.get() == nullptr; }
+
     [[nodiscard]] std::string ToString() const;
     [[nodiscard]] uint64_t Hash() const;
 

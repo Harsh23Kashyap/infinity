@@ -48,7 +48,15 @@ public:
         set_.emplace(std::move(val));
     }
 
-    inline bool Exist(const Value &val) const { return set_.contains(val); }
+    inline bool Exist(const Value &val) const {
+        // SQL: NULL IN (...) is UNKNOWN -> no row matches. Avoid hashing a
+        // NULL Value whose extra info is empty, which would deref a null
+        // shared_ptr in Value::GetVarchar / GetEmbedding / etc.
+        if (val.IsNull()) {
+            return false;
+        }
+        return set_.contains(val);
+    }
     inline DataType Type() const { return data_type_; }
 
     // constructor will throw when illegal type is passed
