@@ -1,0 +1,66 @@
+statement ok
+DROP TABLE IF EXISTS test_in_json_null;
+
+statement ok
+CREATE TABLE test_in_json_null(id VARCHAR, meta JSON);
+
+# Row 1 has $.department; row 2 does not (meta = '{}').
+statement ok
+INSERT INTO test_in_json_null VALUES
+('d1', '{"department":"IB","year":2024}'),
+('d2', '{}');
+
+# Baseline: OR-of-equals form works (returns d1) - this case never crashed.
+query T
+SELECT id FROM test_in_json_null
+WHERE json_extract_string(meta, '$.department') = 'IB'
+   OR json_extract_string(meta, '$.department') = 'SOC'
+ORDER BY id;
+----
+d1
+
+# Regression for the segfault reported in infiniflow/infinity#3400.
+# Without the NULL short-circuit in ValueSet::Exist, this crashed the server
+# (ValueSet::ValueHasher -> Value::GetVarchar on a NULL Value whose
+# value_info_ is an empty shared_ptr).
+query T
+SELECT id FROM test_in_json_null
+WHERE json_extract_string(meta, '$.department') IN ('IB', 'SOC')
+ORDER BY id;
+----
+d1
+
+# NOT IN should match the row whose path is missing - SQL: NULL is unknown,
+# not in the list, so 'NOT IN' is true for it.
+query T
+SELECT id FROM test_in_json_null
+WHERE json_extract_string(meta, '$.department') NOT IN ('IB', 'SOC')
+ORDER BY id;
+----
+d2
+
+# All-missing path case: no rows match, no crash.
+query T
+SELECT id FROM test_in_json_null
+WHERE json_extract_string(meta, '$.nonexistent') IN ('x', 'y')
+ORDER BY id;
+----
+
+# Non-JSON VARCHAR IN must still work - the fix must not regress the common
+# path. (Mirrors test/sql/dql/function/in/in.slt cases.)
+statement ok
+INSERT INTO test_in_json_null VALUES
+('d3', '{"department":"HR"}'),
+('d4', '{"department":"IB"}');
+
+query TT
+SELECT id, json_extract_string(meta, '$.department') AS dept
+FROM test_in_json_null
+WHERE id IN ('d1', 'd4')
+ORDER BY id;
+----
+d1 IB
+d4 IB
+
+statement ok
+DROP TABLE test_in_json_null;
