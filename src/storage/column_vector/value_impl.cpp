@@ -1017,11 +1017,18 @@ bool Value::operator==(const Value &other) const {
             return true;
         }
         case LogicalType::kVarchar: {
+            // Typed-null Values from GetValueByIndex have empty value_info_.
+            if (this->value_info_ == nullptr || other.value_info_ == nullptr) {
+                return this->value_info_ == nullptr && other.value_info_ == nullptr;
+            }
             const std::string &s1 = this->value_info_->Get<StringValueInfo>().GetString();
             const std::string &s2 = other.value_info_->Get<StringValueInfo>().GetString();
             return s1 == s2;
         }
         case LogicalType::kJson: {
+            if (this->value_info_ == nullptr || other.value_info_ == nullptr) {
+                return this->value_info_ == nullptr && other.value_info_ == nullptr;
+            }
             const auto &bson1 = this->GetBson();
             const auto &bson2 = other.GetBson();
             return bson1 == bson2;
@@ -1031,11 +1038,17 @@ bool Value::operator==(const Value &other) const {
         case LogicalType::kMultiVector:
             [[fallthrough]];
         case LogicalType::kTensor: {
+            if (this->value_info_ == nullptr || other.value_info_ == nullptr) {
+                return this->value_info_ == nullptr && other.value_info_ == nullptr;
+            }
             const std::span<char> data1 = this->GetEmbedding();
             const std::span<char> data2 = other.GetEmbedding();
             return std::ranges::equal(data1, data2);
         }
         case LogicalType::kTensorArray: {
+            if (this->value_info_ == nullptr || other.value_info_ == nullptr) {
+                return this->value_info_ == nullptr && other.value_info_ == nullptr;
+            }
             const auto &tensor_array1 = this->GetTensorArray();
             const auto &tensor_array2 = other.GetTensorArray();
             return std::ranges::equal(tensor_array1, tensor_array2, [](const auto &t1, const auto &t2) {
@@ -1043,6 +1056,9 @@ bool Value::operator==(const Value &other) const {
             });
         }
         case LogicalType::kSparse: {
+            if (this->value_info_ == nullptr || other.value_info_ == nullptr) {
+                return this->value_info_ == nullptr && other.value_info_ == nullptr;
+            }
             const auto &sparse1 = GetSparse();
             const auto &sparse2 = other.GetSparse();
             const auto &[nnz1, raw_idx1, raw_data1] = sparse1;
@@ -1050,6 +1066,9 @@ bool Value::operator==(const Value &other) const {
             return nnz1 == nnz2 && std::ranges::equal(raw_idx1, raw_idx2) && std::ranges::equal(raw_data1, raw_data2);
         }
         case LogicalType::kArray: {
+            if (this->value_info_ == nullptr || other.value_info_ == nullptr) {
+                return this->value_info_ == nullptr && other.value_info_ == nullptr;
+            }
             const auto &array1 = this->GetArray();
             const auto &array2 = other.GetArray();
             return std::ranges::equal(array1, array2);
@@ -1452,14 +1471,23 @@ std::string Value::ToString() const {
             return value_.row.ToString();
         }
         case LogicalType::kVarchar: {
+            if (value_info_ == nullptr) {
+                return {};
+            }
             return value_info_->Get<StringValueInfo>().GetString();
         }
         case LogicalType::kJson: {
+            if (value_info_ == nullptr) {
+                return {};
+            }
             const auto &bson = this->GetBson();
             auto json = JsonManager::from_bson(bson);
             return json->dump();
         }
         case LogicalType::kEmbedding: {
+            if (value_info_ == nullptr) {
+                return {};
+            }
             const auto *embedding_info = static_cast<const EmbeddingInfo *>(type_.type_info().get());
             std::span<char> data_span = this->GetEmbedding();
             if (data_span.size() != embedding_info->Size()) {
@@ -1471,6 +1499,9 @@ std::string Value::ToString() const {
         case LogicalType::kMultiVector:
             [[fallthrough]];
         case LogicalType::kTensor: {
+            if (value_info_ == nullptr) {
+                return {};
+            }
             const auto *embedding_info = static_cast<const EmbeddingInfo *>(type_.type_info().get());
             std::span<char> data_span = this->GetEmbedding();
             size_t data_bytes = data_span.size();
@@ -1482,6 +1513,9 @@ std::string Value::ToString() const {
             return TensorT::Tensor2String(data_span.data(), embedding_info->Type(), embedding_info->Dimension(), embedding_num);
         }
         case LogicalType::kTensorArray: {
+            if (value_info_ == nullptr) {
+                return {};
+            }
             const auto *embedding_info = static_cast<const EmbeddingInfo *>(type_.type_info().get());
             const auto &embedding_value_infos = this->GetTensorArray();
             const size_t basic_embedding_bytes = embedding_info->Size();
@@ -1504,6 +1538,9 @@ std::string Value::ToString() const {
             return std::move(oss).str();
         }
         case LogicalType::kSparse: {
+            if (value_info_ == nullptr) {
+                return {};
+            }
             auto *sparse_info = static_cast<SparseInfo *>(type_.type_info().get());
             auto [nnz, indice_span, data_span] = this->GetSparse();
             return SparseT::Sparse2String(data_span.data(), indice_span.data(), sparse_info->DataType(), sparse_info->IndexType(), nnz);
@@ -1512,6 +1549,9 @@ std::string Value::ToString() const {
             return "[]";
         }
         case LogicalType::kArray: {
+            if (value_info_ == nullptr) {
+                return {};
+            }
             const auto &array_elements = this->GetArray();
             std::ostringstream oss;
             oss << '{';
@@ -1586,6 +1626,9 @@ uint64_t Value::Hash() const {
             return std::hash<std::string_view>{}(std::string_view(reinterpret_cast<const char *>(&value_), size));
         }
         case LogicalType::kVarchar: {
+            if (value_info_ == nullptr) {
+                return 0;
+            }
             const auto &str = value_info_->Get<StringValueInfo>().GetString();
             return std::hash<std::string_view>{}(std::string_view(str));
         }
@@ -1772,16 +1815,28 @@ void Value::AppendToJson(const std::string &name, nlohmann::json &json) const {
             return;
         }
         case LogicalType::kVarchar: {
+            if (value_info_ == nullptr) {
+                json[name] = nullptr;
+                return;
+            }
             json[name] = value_info_->Get<StringValueInfo>().GetString();
             return;
         }
         case LogicalType::kJson: {
+            if (value_info_ == nullptr) {
+                json[name] = nullptr;
+                return;
+            }
             const auto &bson = this->GetBson();
             auto data = JsonManager::from_bson(bson);
             json[name] = data->dump();
             return;
         }
         case LogicalType::kEmbedding: {
+            if (value_info_ == nullptr) {
+                json[name] = nullptr;
+                return;
+            }
             const auto *embedding_info = static_cast<const EmbeddingInfo *>(type_.type_info().get());
             std::span<char> data_span = this->GetEmbedding();
             if (data_span.size() != embedding_info->Size()) {
@@ -1794,11 +1849,19 @@ void Value::AppendToJson(const std::string &name, nlohmann::json &json) const {
         case LogicalType::kMultiVector:
             [[fallthrough]];
         case LogicalType::kTensor: {
+            if (value_info_ == nullptr) {
+                json[name] = nullptr;
+                return;
+            }
             const auto *embedding_info = static_cast<const EmbeddingInfo *>(type_.type_info().get());
             Tensor2Json(this->GetEmbedding(), embedding_info->Type(), embedding_info->Dimension(), json[name]);
             return;
         }
         case LogicalType::kTensorArray: {
+            if (value_info_ == nullptr) {
+                json[name] = nullptr;
+                return;
+            }
             const auto *embedding_info = static_cast<const EmbeddingInfo *>(type_.type_info().get());
             const auto &embedding_value_infos = this->GetTensorArray();
             std::vector<std::span<char>> tensor_array;
@@ -1814,6 +1877,10 @@ void Value::AppendToJson(const std::string &name, nlohmann::json &json) const {
             return;
         }
         case LogicalType::kSparse: {
+            if (value_info_ == nullptr) {
+                json[name] = nullptr;
+                return;
+            }
             const auto *sparse_info = static_cast<const SparseInfo *>(type_.type_info().get());
             const auto &sparse_value_info = static_cast<const SparseValueInfo &>(*value_info_);
 
@@ -1823,6 +1890,10 @@ void Value::AppendToJson(const std::string &name, nlohmann::json &json) const {
             return;
         }
         case LogicalType::kArray: {
+            if (value_info_ == nullptr) {
+                json[name] = nullptr;
+                return;
+            }
             auto &array_json = json[name];
             array_json = nlohmann::json::array();
             for (const auto &array_elements = this->GetArray(); const auto &v : array_elements) {
@@ -1931,17 +2002,29 @@ void Value::AppendToArrowArray(const DataType &data_type, arrow::ArrayBuilder *a
         }
         case LogicalType::kVarchar: {
             auto *builder = dynamic_cast<::arrow::StringBuilder *>(array_builder);
+            if (value_info_ == nullptr) {
+                auto status = builder->AppendNull();
+                break;
+            }
             auto status = builder->Append(value_info_->Get<StringValueInfo>().GetString());
             break;
         }
         case LogicalType::kJson: {
             auto *builder = dynamic_cast<::arrow::StringBuilder *>(array_builder);
+            if (value_info_ == nullptr) {
+                auto status = builder->AppendNull();
+                break;
+            }
             const auto &bson = this->GetBson();
             auto json = JsonManager::from_bson(bson);
             auto status = builder->Append(json->dump());
             break;
         }
         case LogicalType::kEmbedding: {
+            if (value_info_ == nullptr) {
+                auto status = array_builder->AppendNull();
+                break;
+            }
             auto embedding_info = static_cast<EmbeddingInfo *>(data_type.type_info().get());
             std::span<char> data_span = this->GetEmbedding();
             if (data_span.size() != embedding_info->Size()) {
@@ -1956,6 +2039,10 @@ void Value::AppendToArrowArray(const DataType &data_type, arrow::ArrayBuilder *a
             break;
         }
         case LogicalType::kSparse: {
+            if (value_info_ == nullptr) {
+                auto status = array_builder->AppendNull();
+                break;
+            }
             const auto *sparse_info = static_cast<const SparseInfo *>(data_type.type_info().get());
             auto *struct_builder = dynamic_cast<arrow::StructBuilder *>(array_builder);
             auto status = struct_builder->Append();
@@ -1978,6 +2065,10 @@ void Value::AppendToArrowArray(const DataType &data_type, arrow::ArrayBuilder *a
         }
         case LogicalType::kMultiVector:
         case LogicalType::kTensor: {
+            if (value_info_ == nullptr) {
+                auto status = array_builder->AppendNull();
+                break;
+            }
             const auto *embedding_info = static_cast<const EmbeddingInfo *>(data_type.type_info().get());
 
             std::span<char> tensor = this->GetEmbedding();
@@ -1988,6 +2079,10 @@ void Value::AppendToArrowArray(const DataType &data_type, arrow::ArrayBuilder *a
             break;
         }
         case LogicalType::kTensorArray: {
+            if (value_info_ == nullptr) {
+                auto status = array_builder->AppendNull();
+                break;
+            }
             const auto *embedding_info = static_cast<const EmbeddingInfo *>(data_type.type_info().get());
 
             const std::vector<std::shared_ptr<EmbeddingValueInfo>> &embedding_value_infos = this->GetTensorArray();
@@ -2002,6 +2097,10 @@ void Value::AppendToArrowArray(const DataType &data_type, arrow::ArrayBuilder *a
             break;
         }
         case LogicalType::kArray: {
+            if (value_info_ == nullptr) {
+                auto status = array_builder->AppendNull();
+                break;
+            }
             auto *list_builder = dynamic_cast<arrow::ListBuilder *>(array_builder);
             auto status = list_builder->Append();
             auto *val_builder = list_builder->value_builder();
