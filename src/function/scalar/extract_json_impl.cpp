@@ -56,6 +56,11 @@ public:
                 const auto json_info = json_column_data[row_index];
                 auto json_data = json_column->buffer_->GetVarchar(json_info.file_offset_, json_info.length_);
                 auto json = JsonManager::from_bson(reinterpret_cast<const uint8_t *>(json_data), json_info.length_);
+                if (!json) {
+                    output_null->Set(row_index, false);
+                    output_column->AppendValue(MakeValueFunc(T{}));
+                    continue;
+                }
                 auto [exist_path, extracted_value] = ExtractFunc(*json, tokens);
                 output_null->Set(row_index, exist_path);
                 Value v = MakeValueFunc(extracted_value);
