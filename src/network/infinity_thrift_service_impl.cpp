@@ -3279,6 +3279,14 @@ void InfinityThriftService::HandleArrayTypeRecursively(std::string &output_str,
                                                        const std::shared_ptr<ColumnVector> &column_vector) {
     auto data = column_vector->buffer_->GetVarchar(data_value.file_offset_, data_value.length_);
     auto json_data = JsonManager::from_bson(reinterpret_cast<const uint8_t *>(data), data_value.length_);
+    if (!json_data) {
+        // NULL or malformed BSON. Thrift ColumnField carries the row's null
+        // bit in the parallel bitmasks field; here we just write a zero-
+        // length body so the wire format stays well-formed.
+        const i32 json_length = 0;
+        output_str.append(reinterpret_cast<const char *>(&json_length), sizeof(i32));
+        return;
+    }
     auto json_str = json_data->dump();
     auto json_length = json_str.length();
 
