@@ -368,8 +368,29 @@ public:
 
     [[nodiscard]] const DataType &type() const { return type_; }
 
-    // True if this Value is NULL (no extra info attached).
-    [[nodiscard]] bool IsNull() const { return value_info_.get() == nullptr; }
+    // True if this Value carries no data. For varlen types (varchar, json,
+    // embedding, tensor, sparse, array) the data is on the heap via
+    // value_info_; a null shared_ptr means the value is typed-NULL. For
+    // fixed-size types the data is inline in value_.T and value_info_ is
+    // always null by construction, so the column null bit is the source of
+    // truth and IsNull() returns false. The varlen convention matches the
+    // per-type guards in PR #11 (Value::ToString, Value::AppendToJson,
+    // Value::AppendToArrowArray).
+    [[nodiscard]] bool IsNull() const {
+        switch (type_.type()) {
+            case LogicalType::kVarchar:
+            case LogicalType::kJson:
+            case LogicalType::kEmbedding:
+            case LogicalType::kMultiVector:
+            case LogicalType::kTensor:
+            case LogicalType::kTensorArray:
+            case LogicalType::kSparse:
+            case LogicalType::kArray:
+                return value_info_ == nullptr;
+            default:
+                return false;
+        }
+    }
 
     [[nodiscard]] std::string ToString() const;
     [[nodiscard]] uint64_t Hash() const;
