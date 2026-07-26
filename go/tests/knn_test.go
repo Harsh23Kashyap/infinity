@@ -3796,7 +3796,7 @@ func TestMatchSparseIndexHint(t *testing.T) {
 
 		indexInfo2 := infinity.NewIndexInfo("c2", infinity.IndexTypeBMP, map[string]string{
 			"block_size":    "8",
-			"compress_type": "raww",
+			"compress_type": "raw",
 		})
 		_, err = table.CreateIndex("idx2", indexInfo2, infinity.ConflictTypeError, "")
 		if err != nil {

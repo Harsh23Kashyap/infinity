@@ -11,7 +11,7 @@ statement ok
 CREATE INDEX idx1 ON test_knn_sparse_bmp (col2) USING Bmp WITH (block_size = 8, compress_type = compress);
 
 statement ok
-CREATE INDEX idx2 ON test_knn_sparse_bmp (col2) USING Bmp WITH (block_size = 16, compress_type = raww);
+CREATE INDEX idx2 ON test_knn_sparse_bmp (col2) USING Bmp WITH (block_size = 16, compress_type = raw);
 
 query I
 SELECT col1 FROM test_knn_sparse_bmp SEARCH MATCH SPARSE (col2, [0:1.0,20:2.0,80:3.0], 'ip', 3) USING INDEX(idx1);

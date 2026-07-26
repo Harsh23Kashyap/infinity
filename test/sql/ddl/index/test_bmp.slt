@@ -35,7 +35,7 @@ statement ok
 CREATE INDEX idx1 ON sqllogic_test_bmp (col2) USING Bmp WITH (block_size = 16, compress_type = compress);
 
 statement ok
-CREATE INDEX idx2 ON sqllogic_test_bmp (col2) USING Bmp WITH (block_size = 16, compress_type = raww);
+CREATE INDEX idx2 ON sqllogic_test_bmp (col2) USING Bmp WITH (block_size = 16, compress_type = raw);
 
 statement ok
 DROP TABLE sqllogic_test_bmp;

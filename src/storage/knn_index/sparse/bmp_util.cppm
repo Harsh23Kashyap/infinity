@@ -79,7 +79,7 @@ private:
 };
 
 export BMPCompressType BMPCompressTypeFromString(const std::string &compress_type_str) {
-    if (compress_type_str == "raww") {
+    if (compress_type_str == "raw" || compress_type_str == "raww") {
         return BMPCompressType::kRaw;
     } else if (compress_type_str == "compress") {
         return BMPCompressType::kCompressed;
