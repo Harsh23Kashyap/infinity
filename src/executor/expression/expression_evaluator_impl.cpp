@@ -210,8 +210,30 @@ void ExpressionEvaluator::Execute(const std::shared_ptr<InExpression> &expr,
     std::shared_ptr<ColumnVector> &left_state_output = left_state->OutputColumnVector();
     Execute(left_expression, left_state, left_state_output);
 
+    // SQL semantics: NULL IN (...) is UNKNOWN -> the filter result bit for the
+    // row is forced to false. NULL NOT IN (...) is also UNKNOWN -> same. We mark
+    // the output cell as null (clear its null bit) so MergeFalseIntoBitmask in
+    // the filter executor turns the result into a false pass.
+    //
+    // Pre-fix: the executor only called Exist(value) and never consulted the
+    // input column's null bitmap. A NULL fixed-size cell (e.g. kInteger)
+    // produces a default-constructed Value via GetValueByIndex; with the
+    // default value (0, 0.0, false, ...) the call could erroneously match a
+    // user-supplied IN set member, returning TRUE for NULL IN (0, ...). PR
+    // #19 fixed IsNull() for fixed-size types but the underlying issue --
+    // the executor not honoring the column null bit -- remains. This commit
+    // fixes the executor.
+
     // in expression evaluates to a constant
     if (left_state->OutputColumnVector()->vector_type() == ColumnVectorType::kConstant) {
+        if (!left_state_output->nulls_ptr_->IsTrue(0)) {
+            // The constant input is NULL. SQL: every output row is UNKNOWN.
+            for (size_t idx = 0; idx < input_data_block_->row_count(); idx++) {
+                output_column_vector->nulls_ptr_->SetFalse(idx);
+            }
+            output_column_vector->Finalize(input_data_block_->row_count());
+            return;
+        }
         bool in_result = (expr->in_type() == InType::kIn) ? expr->Exists(left_state_output->GetValueByIndex(0))
                                                           : !expr->Exists(left_state_output->GetValueByIndex(0));
         for (size_t idx = 0; idx < input_data_block_->row_count(); idx++) {
@@ -222,6 +244,10 @@ void ExpressionEvaluator::Execute(const std::shared_ptr<InExpression> &expr,
     }
     if (expr->in_type() == InType::kIn) {
         for (size_t idx = 0; idx < input_data_block_->row_count(); idx++) {
+            if (!left_state_output->nulls_ptr_->IsTrue(idx)) {
+                output_column_vector->nulls_ptr_->SetFalse(idx);
+                continue;
+            }
             output_column_vector->buffer_->SetCompactBit(idx, expr->Exists(left_state_output->GetValueByIndex(idx)));
         }
         output_column_vector->Finalize(input_data_block_->row_count());
@@ -229,6 +255,10 @@ void ExpressionEvaluator::Execute(const std::shared_ptr<InExpression> &expr,
     }
     if (expr->in_type() == InType::kNotIn) {
         for (size_t idx = 0; idx < input_data_block_->row_count(); idx++) {
+            if (!left_state_output->nulls_ptr_->IsTrue(idx)) {
+                output_column_vector->nulls_ptr_->SetFalse(idx);
+                continue;
+            }
             output_column_vector->buffer_->SetCompactBit(idx, !expr->Exists(left_state_output->GetValueByIndex(idx)));
         }
         output_column_vector->Finalize(input_data_block_->row_count());

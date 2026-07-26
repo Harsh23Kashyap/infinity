@@ -1,0 +1,112 @@
+# name: test/sql/dql/function/in/in_null_bit.slt
+# description: IN/NOT IN must produce UNKNOWN (not TRUE) when the input cell is NULL
+# group: [dql, function, in]
+#
+# SQL semantics: NULL IN (...) is UNKNOWN, NULL NOT IN (...) is UNKNOWN. In a
+# WHERE clause UNKNOWN is treated as false, so NULL rows must not match.
+#
+# Regression for a latent bug: the IN expression executor never consulted
+# the input column's null bitmap. A NULL cell produces a default-constructed
+# Value (e.g. MakeInt(0)), and if the user-supplied IN set contains the
+# default value (0, 0.0, false, ...), the row erroneously matched.
+#
+# Companion to in_json_null.slt (PR #9, varlen typed-NULL segfault) and
+# in_fixed_size.slt (PR #19, IsNull() type-aware). This SLT covers the
+# executor-level null-bit check, which is the only place where SQL NULL
+# semantics for IN can be enforced correctly.
+
+statement ok
+DROP TABLE IF EXISTS test_in_null_bit;
+
+statement ok
+CREATE TABLE test_in_null_bit (id INT, i INT, bi BIGINT, f FLOAT, d DOUBLE, b BOOLEAN, s VARCHAR);
+
+statement ok
+INSERT INTO test_in_null_bit VALUES
+(1,   1,    10,    1.5,  10.5,  true,  'a'),
+(2,   2,    20,    2.5,  20.5,  false, 'b'),
+(3,   3,    30,    3.5,  30.5,  true,  'c'),
+(4,   NULL, 40,    4.5,  40.5,  false, 'd'),
+(5,   5,    NULL, 5.5,  50.5,  true,  NULL),
+(6,   6,    60,    NULL, 60.5,  false, 'f'),
+(7,   7,    70,    7.5,  NULL,  true,  'g'),
+(8,   0,    0,     0.0,  0.0,   false, '');
+
+# 1. NULL IN (0, 1, 2) -- the pre-fix bug. NULL i with 0 in the set used to
+#    match. SQL: NULL IN (...) is UNKNOWN -> excluded.
+query I rowsort
+SELECT id FROM test_in_null_bit WHERE i IN (0, 1, 2);
+----
+1
+2
+8
+
+# 2. NULL NOT IN (0, 1, 2) -- pre-fix: the default-constructed 0 from the
+#    NULL cell made !Exist() return true, so the NULL row was wrongly
+#    included. SQL: NULL NOT IN (...) is UNKNOWN -> excluded.
+query I rowsort
+SELECT id FROM test_in_null_bit WHERE i NOT IN (0, 1, 2);
+----
+3
+6
+
+# 3. NULL BigInt IN (0, 10, 20) -- same bug for BIGINT default value 0.
+query I rowsort
+SELECT id FROM test_in_null_bit WHERE bi IN (0, 10, 20);
+----
+1
+2
+8
+
+# 4. NULL Float IN (0.0, 1.5) -- default value 0.0 for f.
+query I rowsort
+SELECT id FROM test_in_null_bit WHERE f IN (0.0, 1.5);
+----
+1
+8
+
+# 5. NULL Boolean IN (false) -- default value false for b.
+query I rowsort
+SELECT id FROM test_in_null_bit WHERE b IN (false);
+----
+2
+4
+6
+8
+
+# 6. NULL VARCHAR IN ('a', 'b') -- varlen path. PR #9 already covers the
+#    short-circuit on the segfault, but the executor null-bit check is the
+#    SQL-correct path. Verify the NULL row is excluded.
+query I rowsort
+SELECT id FROM test_in_null_bit WHERE s IN ('a', 'b');
+----
+1
+2
+
+# 7. NULL NOT IN with varchar set.
+query I rowsort
+SELECT id FROM test_in_null_bit WHERE s NOT IN ('a', 'b');
+----
+3
+4
+6
+7
+8
+
+# 8. IN set with no matches. SQL: no rows match.
+query I rowsort
+SELECT id FROM test_in_null_bit WHERE i IN (999, 1000, 1001);
+----
+
+# 9. Baseline: i IN (0, 5, 6, 7) -- non-NULL rows that match. Row 4 (i=NULL)
+#    must be excluded.
+query I rowsort
+SELECT id FROM test_in_null_bit WHERE i IN (0, 5, 6, 7);
+----
+5
+6
+7
+8
+
+statement ok
+DROP TABLE test_in_null_bit;
