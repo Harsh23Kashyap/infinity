@@ -12,23 +12,37 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import re
 import functools
 import inspect
+import re
 from typing import Any
+
+import numpy as np
 import pandas as pd
 import polars as pl
-from sqlglot import condition
 import sqlglot.expressions as exp
-import numpy as np
+from sqlglot import condition
+
+from infinity_embedded.common import Array, InfinityException, SparseVector
+from infinity_embedded.embedded_infinity_ext import (
+    ConstraintType,
+    EmbeddingDataType,
+    LiteralType,
+    LogicalType,
+    ParsedExprType,
+    WrapColumnDef,
+    WrapColumnExpr,
+    WrapConstantExpr,
+    WrapDataType,
+    WrapEmbeddingType,
+    WrapFunctionExpr,
+    WrapInExpr,
+    WrapParsedExpr,
+    WrapSparseType,
+)
 from infinity_embedded.errors import ErrorCode
-from infinity_embedded.common import InfinityException, SparseVector, Array
 from infinity_embedded.local_infinity.types import build_result, logic_type_to_dtype
 from infinity_embedded.utils import binary_exp_to_paser_exp
-from infinity_embedded.embedded_infinity_ext import WrapInExpr, WrapParsedExpr, WrapFunctionExpr, \
-    WrapColumnExpr, WrapConstantExpr, ParsedExprType, LiteralType
-from infinity_embedded.embedded_infinity_ext import WrapEmbeddingType, WrapColumnDef, WrapDataType, LogicalType, \
-    EmbeddingDataType, WrapSparseType, ConstraintType
 
 
 def traverse_conditions(cons, fn=None):

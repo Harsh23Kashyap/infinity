@@ -1,6 +1,7 @@
 import ast
 import re
 from enum import Enum
+
 from infinity.common import ConflictType
 from infinity.table import ExplainType
 

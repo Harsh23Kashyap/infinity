@@ -1,13 +1,13 @@
+import infinity
+import numpy as np
 import pandas as pd
 import pytest
-import numpy as np
-from common import common_values
-import infinity
-import infinity.index as index
-from infinity.common import ConflictType, InfinityException, SparseVector, Array
+from infinity import index
+from infinity.common import Array, ConflictType, InfinityException, SparseVector
 from infinity.errors import ErrorCode
-
 from infinity.infinity_http import infinity_http
+
+from common import common_values
 
 
 @pytest.fixture(scope="class")
@@ -498,7 +498,7 @@ class TestInfinity:
         table_obj = db_obj.create_table("test_insert_sparse" + suffix, {"c1": {"type": "sparse,100,float,int"}},
                                         ConflictType.Error)
         assert table_obj
-        res = table_obj.insert([{"c1": SparseVector(**{"indices": [10, 20, 30], "values": [1.1, 2.2, 3.3]})}])
+        res = table_obj.insert([{"c1": SparseVector(indices=[10, 20, 30], values=[1.1, 2.2, 3.3])}])
         assert res.error_code == ErrorCode.OK
         res = table_obj.insert([{"c1": SparseVector([40, 50, 60], [4.4, 5.5, 6.6])}])
         assert res.error_code == ErrorCode.OK
@@ -517,7 +517,6 @@ class TestInfinity:
 
         res = db_obj.drop_table("test_insert_sparse" + suffix, ConflictType.Error)
         assert res.error_code == ErrorCode.OK
-        pass
 
     def _test_insert_multivector(self, suffix):
         """

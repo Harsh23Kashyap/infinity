@@ -12,20 +12,22 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import re
 import functools
 import inspect
+import re
 from typing import Any
+
+import numpy as np
 import pandas as pd
 import polars as pl
-from sqlglot import condition
 import sqlglot.expressions as exp
-import numpy as np
-import infinity.remote_thrift.infinity_thrift_rpc.ttypes as ttypes
+from sqlglot import condition
+
+from infinity.common import Array, InfinityException, SparseVector
+from infinity.errors import ErrorCode
+from infinity.remote_thrift.infinity_thrift_rpc import ttypes
 from infinity.remote_thrift.types import build_result, logic_type_to_dtype
 from infinity.utils import binary_exp_to_paser_exp
-from infinity.common import InfinityException, SparseVector, Array
-from infinity.errors import ErrorCode
 
 
 def map_sqlglot_type_to_infinity_type(type_name: str) -> ttypes.DataType:
@@ -85,7 +87,7 @@ def column_expr_to_string(column_expr: ttypes.ColumnExpr) -> str:
 
 def parsed_expression_to_string(expr: ttypes.ParsedExpr) -> str:
     if expr is None:
-        return str()
+        return ''
 
     expr_type = expr.type
     if expr_type.constant_expr:

@@ -14,31 +14,72 @@
 
 import logging
 from functools import wraps
-from readerwriterlock import rwlock
 
+from readerwriterlock import rwlock
 from thrift.protocol import TBinaryProtocol
 from thrift.transport import TSocket, TTransport
 from thrift.transport.TTransport import TTransportException
 
 from infinity import URI
-from infinity.remote_thrift.infinity_thrift_rpc import InfinityService
-from infinity.remote_thrift.infinity_thrift_rpc.ttypes import (
-    SelectRequest, ExplainRequest, DeleteRequest, UpdateRequest, CommonResponse, CommonRequest,
-    ShowSegmentsRequest, ShowSegmentRequest, ShowBlocksRequest, ShowBlockRequest, ShowBlockColumnRequest,
-    ShowCurrentNodeRequest, OptimizeRequest, AlterIndexRequest, AddColumnsRequest, DropColumnsRequest,
-    DumpIndexRequest, CreateTableSnapshotRequest, CreateDatabaseSnapshotRequest,
-    CreateSystemSnapshotRequest, RestoreSnapshotRequest, ListSnapshotsRequest, ShowSnapshotRequest,
-    DropSnapshotRequest, ConfigValue, SetConfigRequest, ShowConfigRequest,
-    CompactRequest,
-    ConnectRequest, CreateConflict, CreateOption, DropConflict, DropOption,
-    CreateDatabaseRequest, DropDatabaseRequest, ListDatabaseRequest, ShowDatabaseRequest, GetDatabaseRequest,
-    CreateTableRequest, DropTableRequest, RenameTableRequest, ListTableRequest, ShowTableRequest, ShowColumnsRequest,
-    GetTableRequest, IndexInfo, CreateIndexRequest, DropIndexRequest, ShowIndexRequest, ListIndexRequest,
-    Field, InsertRequest, ImportRequest, ExportRequest
-)
-import infinity.remote_thrift.infinity_thrift_rpc.ttypes as ttypes
-from infinity.errors import ErrorCode
 from infinity.common import InfinityException
+from infinity.errors import ErrorCode
+from infinity.remote_thrift.infinity_thrift_rpc import InfinityService, ttypes
+from infinity.remote_thrift.infinity_thrift_rpc.ttypes import (
+    AddColumnsRequest,
+    AlterIndexRequest,
+    CommonRequest,
+    CommonResponse,
+    CompactRequest,
+    ConfigValue,
+    ConnectRequest,
+    CreateConflict,
+    CreateDatabaseRequest,
+    CreateDatabaseSnapshotRequest,
+    CreateIndexRequest,
+    CreateOption,
+    CreateSystemSnapshotRequest,
+    CreateTableRequest,
+    CreateTableSnapshotRequest,
+    DeleteRequest,
+    DropColumnsRequest,
+    DropConflict,
+    DropDatabaseRequest,
+    DropIndexRequest,
+    DropOption,
+    DropSnapshotRequest,
+    DropTableRequest,
+    DumpIndexRequest,
+    ExplainRequest,
+    ExportRequest,
+    Field,
+    GetDatabaseRequest,
+    GetTableRequest,
+    ImportRequest,
+    IndexInfo,
+    InsertRequest,
+    ListDatabaseRequest,
+    ListIndexRequest,
+    ListSnapshotsRequest,
+    ListTableRequest,
+    OptimizeRequest,
+    RenameTableRequest,
+    RestoreSnapshotRequest,
+    SelectRequest,
+    SetConfigRequest,
+    ShowBlockColumnRequest,
+    ShowBlockRequest,
+    ShowBlocksRequest,
+    ShowColumnsRequest,
+    ShowConfigRequest,
+    ShowCurrentNodeRequest,
+    ShowDatabaseRequest,
+    ShowIndexRequest,
+    ShowSegmentRequest,
+    ShowSegmentsRequest,
+    ShowSnapshotRequest,
+    ShowTableRequest,
+    UpdateRequest,
+)
 
 TRY_TIMES = 10
 
@@ -144,7 +185,7 @@ class ThriftInfinityClient:
                             self._reconnect()
                             self.session_i += 1
                             self.logger.debug(
-                                f"Tried {i} times, session_id: {self.session_id}, session_i: {self.session_i}, exception: {str(e)}")
+                                f"Tried {i} times, session_id: {self.session_id}, session_i: {self.session_i}, exception: {e!s}")
                 except Exception:
                     raise
             else:

@@ -1,11 +1,11 @@
-import pytest
-from common import common_values
 import infinity
 import pandas as pd
+import pytest
+from infinity import index
 from infinity.common import ConflictType
-import infinity.index as index
-
 from infinity.infinity_http import infinity_http
+
+from common import common_values
 
 
 class TestInfinity:

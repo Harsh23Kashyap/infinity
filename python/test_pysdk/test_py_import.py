@@ -1,12 +1,20 @@
 import os
-import pytest
-from common import common_values
-import infinity
-from infinity.errors import ErrorCode
-from infinity.common import ConflictType, InfinityException
 
-from common.utils import generate_big_int_csv, copy_data, generate_big_rows_csv, generate_big_columns_csv, generate_fvecs
+import infinity
+import pytest
+from common.utils import (
+    copy_data,
+    generate_big_columns_csv,
+    generate_big_int_csv,
+    generate_big_rows_csv,
+    generate_fvecs,
+)
+from infinity.common import ConflictType, InfinityException
+from infinity.errors import ErrorCode
 from infinity.infinity_http import infinity_http
+
+from common import common_values
+
 
 @pytest.fixture(scope="class")
 def http(request):

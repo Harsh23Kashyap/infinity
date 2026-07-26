@@ -33,6 +33,12 @@ jobs:
     name: code_static_check
     if: ${{ github.event_name != 'pull_request' || (github.event.pull_request.draft == false && contains(github.event.pull_request.labels.*.name, 'ci')) }}
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      actions: write
+      checks: write
+      statuses: write
+      pull-requests: read
     steps:
       - name: Free disk space
         run: |
@@ -46,6 +52,35 @@ jobs:
           fetch-depth: 0
           fetch-tags: false
           submodules: recursive
+
+      - name: Check workflow duplication
+        # When a pushed commit on main is byte-for-byte identical to the merged PR's
+        # content, cancel the whole run to skip the redundant post-merge CI.
+        if: ${{ github.event_name == 'push' && github.ref == 'refs/heads/main' }}
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          HEAD=$(git rev-parse HEAD)
+          PR_NUMBER=$(gh api "repos/${GITHUB_REPOSITORY}/commits/${HEAD}/pulls" --jq '.[0].number' 2>/dev/null || true)
+          echo "HEAD=${HEAD}"
+          echo "PR_NUMBER=${PR_NUMBER}"
+          if [[ -n "${PR_NUMBER}" && "${PR_NUMBER}" != "null" ]]; then
+            MERGE_COMMIT=$(gh api "repos/${GITHUB_REPOSITORY}/pulls/${PR_NUMBER}" -q .merge_commit_sha 2>/dev/null || true)
+            PR_SHA=$(gh api "repos/${GITHUB_REPOSITORY}/git/commits/${MERGE_COMMIT}" -q .tree.sha 2>/dev/null || true)
+            HEAD_SHA=$(git rev-parse HEAD^{tree})
+            echo "PR #${PR_NUMBER} merge commit content hash: ${PR_SHA}"
+            echo "Pushed workspace content hash: ${HEAD_SHA}"
+            if [[ -n "${MERGE_COMMIT}" && -n "${PR_SHA}" && "${HEAD_SHA}" == "${PR_SHA}" ]]; then
+              echo "Cancel myself since the workspace content hash is the same with PR #${PR_NUMBER} merged. See ${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID} for details."
+              if gh run cancel "${GITHUB_RUN_ID}"; then
+                echo "Cancellation requested; this run will be terminated by GitHub."
+                exit 0
+              else
+                echo "gh run cancel denied (need actions: write); running main CI."
+              fi
+            fi
+          fi
+          echo "No duplicate detected; running main CI."
 
       - name: Static check with Ruff
         uses: astral-sh/ruff-action@v3

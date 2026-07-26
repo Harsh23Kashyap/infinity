@@ -14,11 +14,12 @@
 
 from enum import Enum
 
-import infinity.remote_thrift.infinity_thrift_rpc.ttypes as ttypes
+from sqlglot import maybe_parse
+
 from infinity.common import InfinityException
 from infinity.errors import ErrorCode
+from infinity.remote_thrift.infinity_thrift_rpc import ttypes
 from infinity.remote_thrift.utils import parse_expr
-from sqlglot import maybe_parse
 
 
 class IndexType(Enum):

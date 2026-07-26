@@ -11,13 +11,15 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-import os
 import logging
+import os
+
 import infinity
 import pytest
+from infinity.connection_pool import ConnectionPool
 from infinity.errors import ErrorCode
 from infinity.remote_thrift.client import ThriftInfinityClient
-from infinity.connection_pool import ConnectionPool
+
 from common import common_values
 
 

@@ -1,17 +1,16 @@
-import pytest
-from common import common_values
-from common import common_index
 import infinity
-import infinity.index as index
-from infinity.errors import ErrorCode
-from infinity.common import ConflictType, InfinityException, SparseVector
-from common.utils import copy_data, generate_commas_enwiki
 import pandas as pd
 import polars as pl
+import pytest
+from common.utils import copy_data, generate_commas_enwiki
+from infinity import index
+from infinity.common import ConflictType, InfinityException, SparseVector
+from infinity.errors import ErrorCode
+from infinity.infinity_http import infinity_http
 from polars.testing import assert_frame_equal as pl_assert_frame_equal
 from polars.testing import assert_frame_not_equal as pl_assert_frame_not_equal
 
-from infinity.infinity_http import infinity_http
+from common import common_index, common_values
 
 
 @pytest.fixture(scope="class")
@@ -1000,23 +999,21 @@ class TestInfinity:
         test_csv_dir = common_values.TEST_TMP_DIR + "sparse_knn.csv"
         table_obj.import_data(test_csv_dir, import_options={"delimiter": ","})
         res, extra_result = (table_obj.output(["*", "_row_id", "_similarity"])
-                             .match_sparse("c2", SparseVector(**{"indices": [0, 20, 80], "values": [1.0, 2.0, 3.0]}),
+                             .match_sparse("c2", SparseVector(indices=[0, 20, 80], values=[1.0, 2.0, 3.0]),
                                            "ip", 3)
                              .to_pl())
         print(res)
 
         res, extra_result = table_obj.output(["c1", "_similarity"]).match_sparse("c2",
-                                                                                 SparseVector(**{"indices": [0, 20, 80],
-                                                                                                 "values": [1.0, 2.0,
-                                                                                                            3.0]}),
+                                                                                 SparseVector(indices=[0, 20, 80], values=[1.0, 2.0,
+                                                                                                            3.0]),
                                                                                  "ip", 3).to_df()
         pd.testing.assert_frame_equal(res, pd.DataFrame({'c1': [4, 2, 1], 'SIMILARITY': [16.0, 12.0, 6.0]}).astype(
             {'c1': 'Int32', 'SIMILARITY': 'Float32'}))
 
         res, extra_result = table_obj.output(["c1", "_similarity"]).match_sparse("c2",
-                                                                                 SparseVector(**{"indices": [0, 20, 80],
-                                                                                                 "values": [1.0, 2.0,
-                                                                                                            3.0]}),
+                                                                                 SparseVector(indices=[0, 20, 80], values=[1.0, 2.0,
+                                                                                                            3.0]),
                                                                                  "ip", 3, {"threshold": "10"}).to_df()
         pd.testing.assert_frame_equal(res, pd.DataFrame({'c1': [4, 2], 'SIMILARITY': [16.0, 12.0]}).astype(
             {'c1': 'Int32', 'SIMILARITY': 'Float32'}))
@@ -1045,25 +1042,23 @@ class TestInfinity:
 
         res, extra_result = (table_obj
                              .output(["*", "_row_id", "_similarity"])
-                             .match_sparse("c2", SparseVector(**{"indices": [0, 20, 80], "values": [1.0, 2.0, 3.0]}),
+                             .match_sparse("c2", SparseVector(indices=[0, 20, 80], values=[1.0, 2.0, 3.0]),
                                            "ip", 3,
                                            {"alpha": "1.0", "beta": "1.0"})
                              .to_pl())
         print(res)
 
         res, extra_result = table_obj.output(["c1", "_similarity"]).match_sparse("c2",
-                                                                                 SparseVector(**{"indices": [0, 20, 80],
-                                                                                                 "values": [1.0, 2.0,
-                                                                                                            3.0]}),
+                                                                                 SparseVector(indices=[0, 20, 80], values=[1.0, 2.0,
+                                                                                                            3.0]),
                                                                                  "ip", 3, {"alpha": "1.0",
                                                                                            "beta": "1.0"}).to_df()
         pd.testing.assert_frame_equal(res, pd.DataFrame({'c1': [4, 2, 1], 'SIMILARITY': [16.0, 12.0, 6.0]}).astype(
             {'c1': 'Int32', 'SIMILARITY': 'Float32'}))
 
         res, extra_result = table_obj.output(["c1", "_similarity"]).match_sparse("c2",
-                                                                                 SparseVector(**{"indices": [0, 20, 80],
-                                                                                                 "values": [1.0, 2.0,
-                                                                                                            3.0]}),
+                                                                                 SparseVector(indices=[0, 20, 80], values=[1.0, 2.0,
+                                                                                                            3.0]),
                                                                                  "ip", 3,
                                                                                  {"alpha": "1.0", "beta": "1.0",
                                                                                   "threshold": "10"}).to_df()
@@ -1402,7 +1397,7 @@ class TestInfinity:
             with pytest.raises(InfinityException) as e:
                 res, extra_result = (table_obj.output(["*", "_row_id", "_similarity"])
                                      .match_sparse("c2",
-                                                   SparseVector(**{"indices": [0, 20, 80], "values": [1.0, 2.0, 3.0]}),
+                                                   SparseVector(indices=[0, 20, 80], values=[1.0, 2.0, 3.0]),
                                                    "ip", 3)
                                      .to_pl())
             assert e.value.args[0] == ErrorCode.DATA_TYPE_MISMATCH
@@ -1533,7 +1528,7 @@ class TestInfinity:
             res, extra_result = (table_obj
                                  .output(["*", "_row_id", "_similarity"])
                                  .match_sparse("c2",
-                                               SparseVector(**{"indices": [0, 20, 80], "values": [1.0, 2.0, 3.0]}),
+                                               SparseVector(indices=[0, 20, 80], values=[1.0, 2.0, 3.0]),
                                                "ip", 3,
                                                {"alpha": alpha, "beta": beta})
                                  .to_pl())
@@ -1560,7 +1555,7 @@ class TestInfinity:
 
         res, extra_result = (table_obj
                              .output(["*", "_row_id", "_similarity"])
-                             .match_sparse("c2", SparseVector(**{"indices": [0, 20], "values": [1.0, 2.0, 3.0]}), "ip",
+                             .match_sparse("c2", SparseVector(indices=[0, 20], values=[1.0, 2.0, 3.0]), "ip",
                                            3,
                                            {"alpha": "1.0", "beta": "1.0"})
                              .to_pl())
@@ -1587,7 +1582,7 @@ class TestInfinity:
             res, extra_result = (table_obj
                                  .output(["*", "_row_id", "_similarity"])
                                  .match_sparse("c2",
-                                               SparseVector(**{"indices": [0, 20, 80], "values": [1.0, 2.0, 3.0]}),
+                                               SparseVector(indices=[0, 20, 80], values=[1.0, 2.0, 3.0]),
                                                distance_type, 3,
                                                {"alpha": "1.0", "beta": "1.0"})
                                  .to_pl())
@@ -1851,16 +1846,15 @@ class TestInfinity:
 
         res, extra_result = (table_obj
                              .output(["*", "_row_id", "_similarity"])
-                             .match_sparse("c2", SparseVector(**{"indices": [0, 20, 80], "values": [1.0, 2.0, 3.0]}),
+                             .match_sparse("c2", SparseVector(indices=[0, 20, 80], values=[1.0, 2.0, 3.0]),
                                            "ip", 3,
                                            {"alpha": "1.0", "beta": "1.0"})
                              .to_pl())
         print(res)
 
         res, extra_result = table_obj.output(["c1", "_similarity"]).match_sparse("c2",
-                                                                                 SparseVector(**{"indices": [0, 20, 80],
-                                                                                                 "values": [1.0, 2.0,
-                                                                                                            3.0]}),
+                                                                                 SparseVector(indices=[0, 20, 80], values=[1.0, 2.0,
+                                                                                                            3.0]),
                                                                                  "ip", 3,
                                                                                  {"alpha": "1.0", "beta": "1.0",
                                                                                   "index_name": "idx1"}).to_df()
@@ -1868,9 +1862,8 @@ class TestInfinity:
             {'c1': 'Int32', 'SIMILARITY': 'Float32'}))
 
         res, extra_result = table_obj.output(["c1", "_similarity"]).match_sparse("c2",
-                                                                                 SparseVector(**{"indices": [0, 20, 80],
-                                                                                                 "values": [1.0, 2.0,
-                                                                                                            3.0]}),
+                                                                                 SparseVector(indices=[0, 20, 80], values=[1.0, 2.0,
+                                                                                                            3.0]),
                                                                                  "ip", 3,
                                                                                  {"alpha": "1.0", "beta": "1.0",
                                                                                   "threshold": "10",
@@ -1882,8 +1875,7 @@ class TestInfinity:
         with pytest.raises(InfinityException) as e:
             res, extra_result = table_obj.output(["c1", "_similarity"]).match_sparse("c2",
                                                                                      SparseVector(
-                                                                                         **{"indices": [0, 20, 80],
-                                                                                            "values": [1.0, 2.0, 3.0]}),
+                                                                                         indices=[0, 20, 80], values=[1.0, 2.0, 3.0]),
                                                                                      "ip", 3,
                                                                                      {"alpha": "1.0", "beta": "1.0",
                                                                                       "threshold": "10",
@@ -2001,8 +1993,7 @@ class TestInfinity:
                 maxsim = -float('inf')
                 for j in range(data_multivec.shape[0]):
                     sim = float(np.dot(query_multivec[i], data_multivec[j]))
-                    if sim > maxsim:
-                        maxsim = sim
+                    maxsim = max(maxsim, sim)
                 maxsim_sum += maxsim
             return maxsim_sum
 
@@ -2104,8 +2095,7 @@ class TestInfinity:
                 min_distance = len(query_multivec[i])
                 for j in range(len(data_multivec)):
                     distance = hamming_distance(query_multivec[i], data_multivec[j])
-                    if distance < min_distance:
-                        min_distance = distance
+                    min_distance = min(min_distance, distance)
                 min_distance_sum += min_distance
             return min_distance_sum
 
