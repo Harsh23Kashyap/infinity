@@ -106,8 +106,16 @@ private:
                     return std::hash<FloatT>{}(val.GetValue<FloatT>());
                 case LogicalType::kDouble:
                     return std::hash<DoubleT>{}(val.GetValue<DoubleT>());
-                case LogicalType::kVarchar:
+                case LogicalType::kVarchar: {
+                    // Typed-NULL VARCHAR (from GetValueByIndex on a NULL cell, or CAST(NULL AS VARCHAR))
+                    // has a null value_info_; GetVarchar() would deref it. PR #11 makes Value::operator==
+                    // treat both-nulls as equal; mirror that here so two NULL VARCHARs hash to the same
+                    // bucket and ValueComparator agrees.
+                    if (val.value_info_ == nullptr) {
+                        return 0;
+                    }
                     return std::hash<std::string>{}(val.GetVarchar());
+                }
                 default:
                     UnrecoverableError(fmt::format("Not supported type : {}", val.type().ToString()));
                     break;
