@@ -332,11 +332,19 @@ void WalManager::NewFlush() {
                 break;
             }
             case FlushOptionType::kOnlyWrite: {
-                ofs_.flush(); // FIXME: not flush, only write
+                // Rely on the OS to flush WAL pages to disk eventually. The
+                // ofs_.write() at the top of the batch already pushed the bytes
+                // to the page cache; durability here is best-effort.
                 break;
             }
             case FlushOptionType::kFlushPerSecond: {
-                ofs_.flush(); // FIXME: not flush, flush per second
+                // Batch fsyncs to at most one per second.
+                auto now = std::chrono::steady_clock::now();
+                if (last_flush_ts_.time_since_epoch().count() == 0 ||
+                    now - last_flush_ts_ >= std::chrono::seconds(1)) {
+                    ofs_.flush();
+                    last_flush_ts_ = now;
+                }
                 break;
             }
         }
