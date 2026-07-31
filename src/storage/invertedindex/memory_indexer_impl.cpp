@@ -132,12 +132,30 @@ void MemoryIndexer::Insert(std::shared_ptr<ColumnVector> column_vector, u32 row_
         auto inverter = std::make_shared<ColumnInverter>(provider, column_lengths_);
         inverter->InitAnalyzer(this->analyzer_);
         auto func = [this, task, inverter](int id) {
-            size_t column_length_sum = inverter->InvertColumn(task->column_vector_, task->row_offset_, task->row_count_, task->start_doc_id_);
-            term_cnt_ += column_length_sum;
-            if (column_length_sum > 0) {
-                inverter->SortForOfflineDump();
+            bool success = false;
+            try {
+                size_t column_length_sum = inverter->InvertColumn(task->column_vector_, task->row_offset_, task->row_count_, task->start_doc_id_);
+                term_cnt_ += column_length_sum;
+                if (column_length_sum > 0) {
+                    inverter->SortForOfflineDump();
+                }
+                this->ring_sorted_.Put(task->task_seq_, inverter);
+                success = true;
+            } catch (const std::exception &e) {
+                LOG_ERROR(fmt::format("Insert(offline) invert task failed, seq={}, error: {}", task->task_seq_, e.what()));
+            } catch (...) {
+                LOG_ERROR(fmt::format("Insert(offline) invert task failed, seq={}, unknown error", task->task_seq_));
             }
-            this->ring_sorted_.Put(task->task_seq_, inverter);
+            if (!success) {
+                // The unindented continuation below would not run on throw, leaving
+                // the consumer (Commit / WaitForTaskCompletion) waiting on inflight_tasks_ == 0
+                // forever. Decrement here so the deadlock is broken.
+                std::unique_lock lock(mutex_);
+                --inflight_tasks_;
+                if (inflight_tasks_ == 0) {
+                    cv_.notify_one();
+                }
+            }
         };
         {
             std::unique_lock<std::mutex> lock(mutex_);
@@ -151,13 +169,29 @@ void MemoryIndexer::Insert(std::shared_ptr<ColumnVector> column_vector, u32 row_
         auto inverter = std::make_shared<ColumnInverter>(provider, column_lengths_);
         inverter->InitAnalyzer(this->analyzer_);
         auto func = [this, task, inverter](int id) {
-            // LOG_INFO(fmt::format("online inverter {} begin", id));
-            size_t column_length_sum = inverter->InvertColumn(task->column_vector_, task->row_offset_, task->row_count_, task->start_doc_id_);
-            term_cnt_ += column_length_sum;
-            inverter->MergePrepare();
-            inverter->Sort();
-            this->ring_sorted_.Put(task->task_seq_, inverter);
-            // LOG_INFO(fmt::format("online inverter {} end", id));
+            bool success = false;
+            try {
+                // LOG_INFO(fmt::format("online inverter {} begin", id));
+                size_t column_length_sum = inverter->InvertColumn(task->column_vector_, task->row_offset_, task->row_count_, task->start_doc_id_);
+                term_cnt_ += column_length_sum;
+                inverter->MergePrepare();
+                inverter->Sort();
+                this->ring_sorted_.Put(task->task_seq_, inverter);
+                success = true;
+                // LOG_INFO(fmt::format("online inverter {} end", id));
+            } catch (const std::exception &e) {
+                LOG_ERROR(fmt::format("Insert(online) invert task failed, seq={}, error: {}", task->task_seq_, e.what()));
+            } catch (...) {
+                LOG_ERROR(fmt::format("Insert(online) invert task failed, seq={}, unknown error", task->task_seq_));
+            }
+            if (!success) {
+                // Same reason as Insert(offline) above.
+                std::unique_lock lock(mutex_);
+                --inflight_tasks_;
+                if (inflight_tasks_ == 0) {
+                    cv_.notify_one();
+                }
+            }
         };
         {
             std::unique_lock<std::mutex> lock(mutex_);
@@ -210,13 +244,25 @@ void MemoryIndexer::AsyncInsertBottom(const std::shared_ptr<ColumnVector> &colum
     auto inverter = std::make_shared<ColumnInverter>(provider, column_lengths_);
     inverter->InitAnalyzer(this->analyzer_);
     auto func = [this, task, inverter, append_batch](int id) {
-        // LOG_INFO(fmt::format("online inverter {} begin", id));
-        size_t column_length_sum = inverter->InvertColumn(task->column_vector_, task->row_offset_, task->row_count_, task->start_doc_id_);
-        term_cnt_ += column_length_sum;
-        inverter->MergePrepare();
-        inverter->Sort();
-        this->ring_sorted_.Put(task->task_seq_, inverter);
-        // LOG_INFO(fmt::format("online inverter {} end", id));
+        // try/catch wraps the invert + sort + put; the append_batch decrement
+        // is on the success-or-failure path so the AppendMemIndexTask waits
+        // for all 4 corners to complete. Without the catch, an exception
+        // in InvertColumn (e.g. simdjson INCORRECT_TYPE on empty JSON {})
+        // would leave append_batch->task_count_ stuck and the consumer
+        // (NewTxn::AppendMemIndex) would block on its cv forever.
+        try {
+            // LOG_INFO(fmt::format("online inverter {} begin", id));
+            size_t column_length_sum = inverter->InvertColumn(task->column_vector_, task->row_offset_, task->row_count_, task->start_doc_id_);
+            term_cnt_ += column_length_sum;
+            inverter->MergePrepare();
+            inverter->Sort();
+            this->ring_sorted_.Put(task->task_seq_, inverter);
+            // LOG_INFO(fmt::format("online inverter {} end", id));
+        } catch (const std::exception &e) {
+            LOG_ERROR(fmt::format("AsyncInsertBottom invert task failed, seq={}, error: {}", task->task_seq_, e.what()));
+        } catch (...) {
+            LOG_ERROR(fmt::format("AsyncInsertBottom invert task failed, seq={}, unknown error", task->task_seq_));
+        }
         {
             std::unique_lock lock(append_batch->mtx_);
             --append_batch->task_count_;
@@ -255,14 +301,42 @@ std::unique_ptr<std::binary_semaphore> MemoryIndexer::AsyncInsert(std::shared_pt
     inverter->InitAnalyzer(this->analyzer_);
     inverter->AddSema(sema.get());
     auto func = [this, task, inverter](int id) {
-        // LOG_INFO(fmt::format("online inverter {} begin", id));
-        size_t column_length_sum = inverter->InvertColumn(task->column_vector_, task->row_offset_, task->row_count_, task->start_doc_id_);
-        term_cnt_ += column_length_sum;
-        inverter->MergePrepare();
-        inverter->Sort();
-        this->ring_sorted_.Put(task->task_seq_, inverter);
-        // LOG_INFO(fmt::format("online inverter {} end", id));
-        CommitSync(100);
+        // try/catch wraps invert + sort + put; CommitSync and ReleaseSemas
+        // run on both success and failure so the caller's binary_semaphore
+        // is always released. Without the catch, an exception in InvertColumn
+        // (e.g. simdjson INCORRECT_TYPE on empty JSON {}) would leave the
+        // semaphore un-released and the caller would block on sema->acquire()
+        // forever.
+        bool success = false;
+        try {
+            // LOG_INFO(fmt::format("online inverter {} begin", id));
+            size_t column_length_sum = inverter->InvertColumn(task->column_vector_, task->row_offset_, task->row_count_, task->start_doc_id_);
+            term_cnt_ += column_length_sum;
+            inverter->MergePrepare();
+            inverter->Sort();
+            this->ring_sorted_.Put(task->task_seq_, inverter);
+            success = true;
+            // LOG_INFO(fmt::format("online inverter {} end", id));
+        } catch (const std::exception &e) {
+            LOG_ERROR(fmt::format("AsyncInsert invert task failed, seq={}, error: {}", task->task_seq_, e.what()));
+        } catch (...) {
+            LOG_ERROR(fmt::format("AsyncInsert invert task failed, seq={}, unknown error", task->task_seq_));
+        }
+        if (success) {
+            // CommitSync calls ReleaseSemas internally after generating postings.
+            CommitSync(100);
+        } else {
+            // Invert failed: release semaphores here so callers do not block.
+            // The atomic guard in ReleaseSemas makes the double-release safe
+            // (if CommitSync is reached by another path, the second call is
+            // a no-op).
+            inverter->ReleaseSemas();
+            std::unique_lock lock(mutex_);
+            --inflight_tasks_;
+            if (inflight_tasks_ == 0) {
+                cv_.notify_one();
+            }
+        }
     };
     {
         std::unique_lock<std::mutex> lock(mutex_);
@@ -342,11 +416,12 @@ size_t MemoryIndexer::CommitSync(size_t wait_if_empty_ms) {
             mem_usage_change.Add(inverter->GeneratePosting());
             num_generated += inverter->GetMerged();
 
-            if (const auto &semas = inverter->semas(); !semas.empty()) {
-                for (auto sema : semas) {
-                    sema->release();
-                }
-            }
+            // ReleaseSemas is a one-shot per ColumnInverter. Both the
+            // AsyncInsert lambda (on invert failure) and CommitSync reach
+            // here; the atomic guard inside ReleaseSemas makes the second
+            // call a no-op, so callers of AsyncInsert are never blocked on
+            // a semaphore regardless of which path releases it.
+            inverter->ReleaseSemas();
         }
     }
     if (num_generated > 0) {
