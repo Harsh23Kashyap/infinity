@@ -147,6 +147,10 @@ void MemoryIndexer::Insert(std::shared_ptr<ColumnVector> column_vector, u32 row_
                 LOG_ERROR(fmt::format("Insert(offline) invert task failed, seq={}, unknown error", task->task_seq_));
             }
             if (!success) {
+                // The unindented continuation below would not run on throw, leaving
+                // the consumer (Commit / WaitForTaskCompletion) waiting on inflight_tasks_ == 0
+                // forever. Decrement here so the deadlock is broken.
+: prevent full-text inverting exception from deadlock)
                 std::unique_lock lock(mutex_);
                 --inflight_tasks_;
                 if (inflight_tasks_ == 0) {
@@ -181,11 +185,6 @@ void MemoryIndexer::Insert(std::shared_ptr<ColumnVector> column_vector, u32 row_
             } catch (...) {
                 LOG_ERROR(fmt::format("Insert(online) invert task failed, seq={}, unknown error", task->task_seq_));
             }
-            if (success) {
-                // Proactively drain the ring to prevent deadlock when the ring fills up.
-                // CommitSync uses try_lock so it is safe and non-blocking if another thread is already committing.
-                CommitSync(100);
-            } else {
                 std::unique_lock lock(mutex_);
                 --inflight_tasks_;
                 if (inflight_tasks_ == 0) {
@@ -244,50 +243,11 @@ void MemoryIndexer::AsyncInsertBottom(const std::shared_ptr<ColumnVector> &colum
     auto inverter = std::make_shared<ColumnInverter>(provider, column_lengths_);
     inverter->InitAnalyzer(this->analyzer_);
     auto func = [this, task, inverter, append_batch](int id) {
-        try {
             size_t column_length_sum = inverter->InvertColumn(task->column_vector_, task->row_offset_, task->row_count_, task->start_doc_id_);
             term_cnt_ += column_length_sum;
             inverter->MergePrepare();
             inverter->Sort();
             this->ring_sorted_.Put(task->task_seq_, inverter);
-            // Proactively drain the ring to prevent deadlock when the ring fills up.
-            // CommitSync uses try_lock so it is safe and non-blocking if another thread is already committing.
-            CommitSync(100);
-        } catch (const std::exception &e) {
-            std::string sample_data;
-            for (u32 i = 0; i < std::min(task->row_count_, 3u); ++i) {
-                try {
-                    sample_data += fmt::format(" row[{}]={}", task->start_doc_id_ + i, task->column_vector_->ToString(task->row_offset_ + i));
-                } catch (...) {
-                    sample_data += fmt::format(" row[{}]=<unreadable>", task->start_doc_id_ + i);
-                }
-            }
-            LOG_ERROR(fmt::format("AsyncInsertBottom invert task failed, db={}, table={}, index={}, base_name={}, base_row_id={}, seq={}, "
-                                  "start_doc_id={}, row_offset={}, row_count={}, absolute_row={}, error: {}, sample:{}",
-                                  this->db_name_,
-                                  this->table_name_,
-                                  this->index_name_,
-                                  this->base_name_,
-                                  this->base_row_id_.ToUint64(),
-                                  task->task_seq_,
-                                  task->start_doc_id_,
-                                  task->row_offset_,
-                                  task->row_count_,
-                                  this->base_row_id_.ToUint64() + task->start_doc_id_,
-                                  e.what(),
-                                  sample_data));
-        } catch (...) {
-            LOG_ERROR(fmt::format("AsyncInsertBottom invert task failed, db={}, table={}, index={}, base_name={}, base_row_id={}, seq={}, "
-                                  "start_doc_id={}, row_offset={}, row_count={}, unknown error",
-                                  this->db_name_,
-                                  this->table_name_,
-                                  this->index_name_,
-                                  this->base_name_,
-                                  this->base_row_id_.ToUint64(),
-                                  task->task_seq_,
-                                  task->start_doc_id_,
-                                  task->row_offset_,
-                                  task->row_count_));
         }
         {
             std::unique_lock lock(append_batch->mtx_);
@@ -327,6 +287,13 @@ std::unique_ptr<std::binary_semaphore> MemoryIndexer::AsyncInsert(std::shared_pt
     inverter->InitAnalyzer(this->analyzer_);
     inverter->AddSema(sema.get());
     auto func = [this, task, inverter](int id) {
+        // try/catch wraps invert + sort + put; CommitSync and ReleaseSemas
+        // run on both success and failure so the caller's binary_semaphore
+        // is always released. Without the catch, an exception in InvertColumn
+        // (e.g. simdjson INCORRECT_TYPE on empty JSON {}) would leave the
+        // semaphore un-released and the caller would block on sema->acquire()
+        // forever.
+: prevent full-text inverting exception from deadlock)
         bool success = false;
         try {
             // LOG_INFO(fmt::format("online inverter {} begin", id));
@@ -343,15 +310,6 @@ std::unique_ptr<std::binary_semaphore> MemoryIndexer::AsyncInsert(std::shared_pt
             LOG_ERROR(fmt::format("AsyncInsert invert task failed, seq={}, unknown error", task->task_seq_));
         }
         if (success) {
-            // Release semaphores only after data is actually committed.
-            // CommitSync generates postings and releases semaphores inside.
-            // If CommitSync returns 0 (ring gap or try_lock failed), release
-            // semaphores here to prevent deadlock and schedule a retry.
-            if (CommitSync(100) == 0) {
-                inverter->ReleaseSemas();
-                Commit(false);
-            }
-        } else {
             inverter->ReleaseSemas();
             std::unique_lock lock(mutex_);
             --inflight_tasks_;
@@ -438,6 +396,12 @@ size_t MemoryIndexer::CommitSync(size_t wait_if_empty_ms) {
             mem_usage_change.Add(inverter->GeneratePosting());
             num_generated += inverter->GetMerged();
 
+            // ReleaseSemas is a one-shot per ColumnInverter. Both the
+            // AsyncInsert lambda (on invert failure) and CommitSync reach
+            // here; the atomic guard inside ReleaseSemas makes the second
+            // call a no-op, so callers of AsyncInsert are never blocked on
+            // a semaphore regardless of which path releases it.
+: prevent full-text inverting exception from deadlock)
             inverter->ReleaseSemas();
         }
     }
