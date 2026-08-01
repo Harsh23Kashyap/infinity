@@ -1,0 +1,91 @@
+# Regression for #28: IndexFilterEvaluatorBuildFromAnd/Or missing break; segfault.
+#
+# The kAnd / kOr case bodies in src/planner/optimizer/index_scan/
+# index_filter_evaluators_impl.cpp (the switch inside
+# IndexFilterEvaluatorBuildFromAnd and the mirror
+# IndexFilterEvaluatorBuildFromOr) were missing `break;` after the
+# child-merge loop. A child classified as kAnd in
+# IndexFilterEvaluatorBuildFromAnd would fall through to the kOr
+# case, which pushed the already-moved-from child a second time
+# into other_children_evaluators. The mirror pair (kOr then kAnd in
+# IndexFilterEvaluatorBuildFromOr) had the same bug. The first
+# Evaluate on the resulting corrupted tree dereferenced a stale
+# pointer and SIGSEGVd the server.
+#
+# The crash trigger (upstream infiniflow/infinity#3399): a WHERE filter
+# that ANDs one condition on a secondary-indexed non-JSON column with
+# 2+ json_extract_* conditions on a secondary-indexed JSON column.
+# Other combinations (no plain indexed, 1 plain + 1 json, N plain + N
+# json) do not exercise the fall-through path.
+#
+# Pre-fix: the third query in this file SIGSEGVs the server.
+# Post-fix: all 4 queries return the correct rows without server
+# restart.
+
+statement ok
+DROP TABLE IF EXISTS test_index_andor_break;
+
+statement ok
+CREATE TABLE test_index_andor_break (
+    id varchar,
+    available_int integer DEFAULT 1,
+    meta json DEFAULT '{}'
+);
+
+statement ok
+CREATE INDEX idx_available ON test_index_andor_break (available_int) USING SECONDARY;
+
+statement ok
+CREATE INDEX idx_meta ON test_index_andor_break (meta) USING SECONDARY;
+
+statement ok
+INSERT INTO test_index_andor_break VALUES
+('d1', 1, '{"department": "IB", "year": 2024, "acl": ["g1"]}'),
+('d2', 1, '{}');
+
+# Baseline 1: two json_extract_* conditions on the JSON column, no
+# plain indexed condition. Works pre- and post-fix.
+query T
+SELECT id FROM test_index_andor_break
+ WHERE json_extract_string(meta, '$.department') = 'IB'
+   AND json_extract_int(meta, '$.year') >= 2024
+ ORDER BY id;
+----
+d1
+
+# Baseline 2: one plain indexed condition + one json_extract_* on the
+# JSON column. Works pre- and post-fix.
+query T
+SELECT id FROM test_index_andor_break
+ WHERE available_int = 1
+   AND json_extract_string(meta, '$.department') = 'IB'
+ ORDER BY id;
+----
+d1
+
+# The crashing query: one plain indexed condition + two json_extract_*
+# on the JSON column. Pre-fix this SIGSEGVs the server in
+# IndexFilterEvaluatorAND::Evaluate. Post-fix it returns the matching
+# row.
+query T
+SELECT id FROM test_index_andor_break
+ WHERE available_int = 1
+   AND json_extract_string(meta, '$.department') = 'IB'
+   AND json_extract_int(meta, '$.year') >= 2024
+ ORDER BY id;
+----
+d1
+
+# Same crash trigger in the mirror direction: one plain + two json
+# with different operators. Post-fix returns the matching row.
+query T
+SELECT id FROM test_index_andor_break
+ WHERE available_int = 1
+   AND json_extract_int(meta, '$.year') >= 2024
+   AND json_extract_string(meta, '$.department') = 'IB'
+ ORDER BY id;
+----
+d1
+
+statement ok
+DROP TABLE test_index_andor_break;
