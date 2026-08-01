@@ -182,9 +182,14 @@ std::unique_ptr<IndexFilterEvaluator> IndexFilterEvaluatorBuildFromAnd(std::vect
                 for (auto &chi : child_logical->other_children_evaluators_) {
                     other_children_evaluators.push_back(std::move(chi));
                 }
+                // Without this break the kOr case below runs and pushes the
+                // already-moved-from child again, double-pushing into
+                // other_children_evaluators and corrupting the evaluator tree.
+                break;
             }
             case Type::kOr: {
                 other_children_evaluators.push_back(std::move(child));
+                break;
             }
         }
     }
@@ -258,9 +263,13 @@ std::unique_ptr<IndexFilterEvaluator> IndexFilterEvaluatorBuildFromOr(std::vecto
                 for (auto &chi : child_logical->other_children_evaluators_) {
                     other_children_evaluators.push_back(std::move(chi));
                 }
+                // Mirror of the kAnd fix above: without this break the kAnd
+                // case below runs and double-pushes into other_children_evaluators.
+                break;
             }
             case Type::kAnd: {
                 other_children_evaluators.push_back(std::move(child));
+                break;
             }
         }
     }
