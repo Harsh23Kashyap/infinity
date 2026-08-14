@@ -1,0 +1,105 @@
+# name: test/sql/dql/function/and_or/and_or_null.slt
+# description: 3-valued boolean AND/OR null semantics. NULL AND false = false,
+#              false AND NULL = false, NULL AND true = NULL, true AND NULL = NULL,
+#              NULL AND NULL = NULL. Mirror for OR with true dominating.
+# group: [dql]
+
+statement ok
+DROP TABLE IF EXISTS test_and_or_null;
+
+statement ok
+CREATE TABLE test_and_or_null (id INTEGER, flag BOOLEAN);
+
+statement ok
+INSERT INTO test_and_or_null VALUES (1, true), (2, false), (3, NULL);
+
+# AND truth table — exercise both directions and the dominating literal.
+query IT rowsort
+SELECT id, flag AND NULL FROM test_and_or_null;
+----
+1 null
+2 false
+3 null
+
+query IT rowsort
+SELECT id, NULL AND flag FROM test_and_or_null;
+----
+1 null
+2 false
+3 null
+
+query IT rowsort
+SELECT id, flag AND true FROM test_and_or_null;
+----
+1 true
+2 false
+3 null
+
+query IT rowsort
+SELECT id, flag AND false FROM test_and_or_null;
+----
+1 false
+2 false
+3 false
+
+# OR truth table
+query IT rowsort
+SELECT id, flag OR NULL FROM test_and_or_null;
+----
+1 true
+2 null
+3 null
+
+query IT rowsort
+SELECT id, NULL OR flag FROM test_and_or_null;
+----
+1 true
+2 null
+3 null
+
+query IT rowsort
+SELECT id, flag OR true FROM test_and_or_null;
+----
+1 true
+2 true
+3 true
+
+query IT rowsort
+SELECT id, flag OR false FROM test_and_or_null;
+----
+1 true
+2 false
+3 null
+
+# NULL AND NULL = NULL, NULL OR NULL = NULL
+query T rowsort
+SELECT NULL AND NULL FROM test_and_or_null;
+----
+null
+null
+null
+
+query T rowsort
+SELECT NULL OR NULL FROM test_and_or_null;
+----
+null
+null
+null
+
+# WHERE-clause: a row with NULL AND false must NOT match (false dominates).
+query I rowsort
+SELECT id FROM test_and_or_null WHERE flag AND false;
+----
+1
+2
+
+# WHERE-clause: a row with NULL OR true must match (true dominates).
+query I rowsort
+SELECT id FROM test_and_or_null WHERE flag OR true;
+----
+1
+2
+3
+
+statement ok
+DROP TABLE test_and_or_null;
