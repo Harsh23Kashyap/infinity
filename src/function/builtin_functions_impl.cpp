@@ -33,6 +33,7 @@ import :isnan;
 import :isinf;
 import :isfinite;
 import :and_func;
+import :is_null;
 import :divide;
 import :equals;
 import :extract;
@@ -126,6 +127,9 @@ void BuiltinFunctions::RegisterScalarFunction() {
     RegisterAndFunction(catalog_ptr_);
     RegisterOrFunction(catalog_ptr_);
     RegisterNotFunction(catalog_ptr_);
+
+    // Null-check functions
+    RegisterIsNullFunction(catalog_ptr_);
 
     // Math functions
     RegisterAbsFunction(catalog_ptr_);
