@@ -1,0 +1,85 @@
+# name: test/sql/dql/function/is_null/is_null_function.slt
+# description: is_null(col) and is_not_null(col) scalar functions. SQL IS NULL / IS NOT
+#              NULL operators also exist and work; these scalar functions accept the
+#              same arguments and return BOOLEAN.
+# group: [dql]
+
+statement ok
+DROP TABLE IF EXISTS test_is_null_fn;
+
+statement ok
+CREATE TABLE test_is_null_fn (id INTEGER, name VARCHAR, score INTEGER);
+
+statement ok
+INSERT INTO test_is_null_fn (id) VALUES (1);
+
+statement ok
+INSERT INTO test_is_null_fn (id, name, score) VALUES (2, 'alice', 100);
+
+statement ok
+INSERT INTO test_is_null_fn (id, name, score) VALUES (3, 'bob', 200);
+
+statement ok
+INSERT INTO test_is_null_fn VALUES (4, NULL, NULL);
+
+# is_null on the name column
+query IT rowsort
+SELECT id, is_null(name) FROM test_is_null_fn;
+----
+1 true
+2 false
+3 false
+4 true
+
+# is_not_null on the name column
+query IT rowsort
+SELECT id, is_not_null(name) FROM test_is_null_fn;
+----
+1 false
+2 true
+3 true
+4 false
+
+# is_null on the score column (mixed nulls and values)
+query IT rowsort
+SELECT id, is_null(score) FROM test_is_null_fn;
+----
+1 true
+2 false
+3 false
+4 true
+
+# is_null on a non-null integer column where every row has a value
+query II rowsort
+SELECT id, is_null(id) FROM test_is_null_fn;
+----
+1 false
+2 false
+3 false
+4 false
+
+# is_null as a WHERE filter: rows where name is null
+query I rowsort
+SELECT id FROM test_is_null_fn WHERE is_null(name);
+----
+1
+4
+
+# is_not_null as a WHERE filter
+query IT rowsort
+SELECT id, name FROM test_is_null_fn WHERE is_not_null(name);
+----
+2 alice
+3 bob
+
+# Nested use: is_null inside a CASE expression
+query IT rowsort
+SELECT id, CASE WHEN is_null(name) THEN 'no-name' ELSE name END FROM test_is_null_fn;
+----
+1 no-name
+2 alice
+3 bob
+4 no-name
+
+statement ok
+DROP TABLE test_is_null_fn;
