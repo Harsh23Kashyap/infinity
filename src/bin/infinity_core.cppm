@@ -632,6 +632,7 @@ export import :abs;
 export import :quarter;
 export import :like;
 export import :isinf;
+export import :is_null;
 export import :sqrt;
 export import :not_func;
 export import :year;
