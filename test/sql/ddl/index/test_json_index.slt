@@ -130,7 +130,7 @@ SELECT id FROM test_json_index WHERE json_extract_string(meta, '$.author') == 'B
 query T
 SELECT json_extract_string(meta, '$.time') FROM test_json_index WHERE id = 5;
 ----
-"2026-05-27T23:59:59"
+2026-05-27T23:59:59
 
 query I
 SELECT id FROM test_json_index WHERE json_extract_string(meta, '$.author') > 'Bob';
@@ -182,6 +182,13 @@ query I
 SELECT id FROM test_json_index WHERE json_exists_path(meta, '$.name');
 ----
 4
+
+query I
+SELECT id FROM test_json_index WHERE json_exists_path(meta, '$.character');
+----
+1
+2
+3
 
 statement ok
 DROP TABLE test_json_index;
