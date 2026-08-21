@@ -282,17 +282,17 @@ INSERT INTO test_json_filter VALUES (16, 'q', '{"string_number": "123", "string_
 query T
 SELECT json_extract_string(c3, '$.string_number') FROM test_json_filter WHERE c1 = 16;
 ----
-"123"
+123
 
 query T
 SELECT json_extract_string(c3, '$.string_float') FROM test_json_filter WHERE c1 = 16;
 ----
-"45.67"
+45.67
 
 query T
 SELECT json_extract_string(c3, '$.string_bool') FROM test_json_filter WHERE c1 = 16;
 ----
-"true"
+true
 
 statement ok
 INSERT INTO test_json_filter VALUES (17, 'r', '{"a": [1, 2, 3], "b": [[4, 5], [6, 7]], "c": {"d": {"e": 8}}}')
@@ -605,7 +605,7 @@ SELECT id, json_extract(tags, '$[0]') AS first_object FROM user_tags WHERE id = 
 query IT
 SELECT id, json_extract_string(tags, '$[0].name') AS first_name FROM user_tags WHERE id = 6;
 ----
-6 "张三"
+6 张三
 
 query II
 SELECT id, json_extract_int(tags, '$[0].age') AS first_age FROM user_tags WHERE id = 6;
@@ -615,7 +615,7 @@ SELECT id, json_extract_int(tags, '$[0].age') AS first_age FROM user_tags WHERE 
 query IT
 SELECT id, json_extract_string(tags, '$[1].name') AS second_name FROM user_tags WHERE id = 6;
 ----
-6 "李四"
+6 李四
 
 query II
 SELECT id, json_extract_int(tags, '$[1].age') AS second_age FROM user_tags WHERE id = 6;
@@ -651,7 +651,7 @@ SELECT id, json_extract_bool(tags, '$[1]') AS second_element FROM user_tags WHER
 query IT
 SELECT id, json_extract_string(tags, '$[0]') AS first_element FROM user_tags WHERE id = 1;
 ----
-1 "电商"
+1 电商
 
 # json_extract_bool on non-boolean elements
 query IB
@@ -731,7 +731,7 @@ SELECT id, json_extract_int(tags, '$[0]') FROM user_tags WHERE id = 10;
 query IT
 SELECT id, json_extract_string(tags, '$[1]') FROM user_tags WHERE id = 10;
 ----
-10 "two"
+10 two
 
 query IF
 SELECT id, json_extract_double(tags, '$[2]') FROM user_tags WHERE id = 10;
@@ -756,7 +756,7 @@ SELECT id, json_extract(tags, '$[5]') FROM user_tags WHERE id = 10;
 query IT
 SELECT id, json_extract_string(tags, '$[5].key') FROM user_tags WHERE id = 10;
 ----
-10 "value"
+10 value
 
 # large arrays
 statement ok
@@ -986,25 +986,25 @@ query II
 SELECT c1, CAST(json_extract_string(c2, '$.int_val') AS INTEGER)
 FROM test_json_cast WHERE c1 = 1;
 ----
-1 null
+1 42
 
 query IT
 SELECT c1, CAST(json_extract_string(c2, '$.float_val') AS DOUBLE)
 FROM test_json_cast WHERE c1 = 2;
 ----
-2 null
+2 3.140000
 
 query IB
 SELECT c1, CAST(json_extract_string(c2, '$.bool_val') AS BOOLEAN)
 FROM test_json_cast WHERE c1 = 3;
 ----
-3 null
+3 true
 
 query IT
 SELECT c1, CAST(json_extract_string(c2, '$.name') AS VARCHAR)
 FROM test_json_cast WHERE c1 = 4;
 ----
-4 "Alice"
+4 Alice
 
 # ============================================================================
 # Part 18: Edge Cases and Error Handling
