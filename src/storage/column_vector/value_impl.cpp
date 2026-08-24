@@ -690,6 +690,9 @@ void Value::AppendToTensorArray(const char *ptr, size_t bytes) {
     if (type_.type() != LogicalType::kTensorArray) {
         UnrecoverableError(fmt::format("Value::AppendToTensorArray() is not supported for type {}", type_.ToString()));
     }
+    if (value_info_ == nullptr) {
+        UnrecoverableError("Value::AppendToTensorArray() called on a Value with null value_info_");
+    }
     const auto embedding_info = static_cast<const EmbeddingInfo *>(type_.type_info().get());
     if (const size_t len = embedding_info->Size(); len == 0 or bytes % len != 0) {
         auto status =
@@ -703,6 +706,9 @@ void Value::AppendToTensorArray(const char *ptr, size_t bytes) {
 void Value::AppendToTensorArray(const std::vector<std::pair<char *, size_t>> &ptr_bytes) {
     if (type_.type() != LogicalType::kTensorArray) {
         UnrecoverableError(fmt::format("Value::AppendToTensorArray() is not supported for type {}", type_.ToString()));
+    }
+    if (value_info_ == nullptr) {
+        UnrecoverableError("Value::AppendToTensorArray() called on a Value with null value_info_");
     }
     auto &tensor_array_info = value_info_->Get<TensorArrayValueInfo>();
     tensor_array_info.AppendTensor(ptr_bytes);
@@ -1586,6 +1592,10 @@ uint64_t Value::Hash() const {
             return std::hash<std::string_view>{}(std::string_view(reinterpret_cast<const char *>(&value_), size));
         }
         case LogicalType::kVarchar: {
+            if (value_info_ == nullptr) {
+                // Sentinel: avoid hash("") which collides with a valid empty VARCHAR.
+                return 0xDEADBEEFCAFEBEEFULL;
+            }
             const auto &str = value_info_->Get<StringValueInfo>().GetString();
             return std::hash<std::string_view>{}(std::string_view(str));
         }
