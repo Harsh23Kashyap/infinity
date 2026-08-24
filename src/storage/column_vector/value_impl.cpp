@@ -1593,7 +1593,8 @@ uint64_t Value::Hash() const {
         }
         case LogicalType::kVarchar: {
             if (value_info_ == nullptr) {
-                return std::hash<std::string_view>{}(std::string_view{});
+                // Sentinel: avoid hash("") which collides with a valid empty VARCHAR.
+                return 0xDEADBEEFCAFEBEEFULL;
             }
             const auto &str = value_info_->Get<StringValueInfo>().GetString();
             return std::hash<std::string_view>{}(std::string_view(str));
