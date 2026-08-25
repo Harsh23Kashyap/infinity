@@ -2033,7 +2033,12 @@ void Value::AppendToArrowArray(const DataType &data_type, arrow::ArrayBuilder *a
     }
 }
 
-const std::vector<Value> &Value::GetArray() const { return this->value_info_->Get<ArrayValueInfo>().array_elements_; }
+const std::vector<Value> &Value::GetArray() const {
+    if (this->value_info_ == nullptr) {
+        UnrecoverableError("Value::GetArray() called on a Value with null value_info_");
+    }
+    return this->value_info_->Get<ArrayValueInfo>().array_elements_;
+}
 
 std::shared_ptr<EmbeddingValueInfo> EmbeddingValueInfo::MakeTensorValueInfo(const char *ptr, size_t bytes) {
     if (bytes == 0) {
