@@ -73,13 +73,20 @@ void EMVBIndexInMem::Insert(const ColumnVector &column_vector,
     std::unique_lock lock(rw_mutex_);
     if (is_built_.test(std::memory_order_acquire)) {
         for (u32 i = 0; i < row_count; ++i) {
+            if (column_vector.nulls_ptr_ && !column_vector.nulls_ptr_->IsTrue(row_offset + i)) {
+                continue;
+            }
             auto [raw_data, embedding_num] = column_vector.GetTensorRaw(row_offset + i);
-            emvb_index_->AddOneDocEmbeddings(reinterpret_cast<const f32 *>(raw_data.data()), embedding_num);
+            const SegmentOffset new_segment_offset = begin_row_id_.segment_offset_ + row_offset + i;
+            emvb_index_->AddOneDocEmbeddings(reinterpret_cast<const f32 *>(raw_data.data()), embedding_num, new_segment_offset);
             ++row_count_;
             embedding_count_ += embedding_num;
         }
     } else {
         for (u32 i = 0; i < row_count; ++i) {
+            if (column_vector.nulls_ptr_ && !column_vector.nulls_ptr_->IsTrue(row_offset + i)) {
+                continue;
+            }
             auto [raw_data, embedding_num] = column_vector.GetTensorRaw(row_offset + i);
             ++row_count_;
             embedding_count_ += embedding_num;
