@@ -7,6 +7,7 @@ import :value_expression;
 import :data_block;
 import :query_context;
 import :operator_state;
+import :segment_meta;
 import :utility;
 
 import std;
@@ -52,8 +53,7 @@ void PhysicalShow::ExecuteShowSegmentDetail(QueryContext *query_context, ShowOpe
 
         ++column_id;
         {
-            // SegmentEntry::SegmentStatusToString(segment_info->status_)
-            Value value = Value::MakeVarchar("No value");
+            Value value = Value::MakeVarchar(ToString(segment_info->status_));
             ValueExpression value_expr(value);
             value_expr.AppendToChunk(output_block_ptr->column_vectors_[column_id]);
         }
