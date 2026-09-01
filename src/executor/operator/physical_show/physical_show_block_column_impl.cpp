@@ -69,8 +69,12 @@ void PhysicalShow::ExecuteShowBlockColumn(QueryContext *query_context, ShowOpera
 
         ++column_id;
         {
-            Value value = Value::MakeVarchar("TODO");
-            //            Value value = Value::MakeVarchar(*block_column_info->filename_);
+            // The filename_ field is initialized to nullptr in
+            // block_meta_impl.cpp:349 (a // TODO in the upstream that
+            // hasn't been resolved). Until that's fixed, emit an empty
+            // string when the field is null instead of the previous
+            // "TODO" placeholder.
+            Value value = block_column_info->filename_ ? Value::MakeVarchar(*block_column_info->filename_) : Value::MakeVarchar("");
             ValueExpression value_expr(value);
             value_expr.AppendToChunk(output_block_ptr->column_vectors_[column_id]);
         }
