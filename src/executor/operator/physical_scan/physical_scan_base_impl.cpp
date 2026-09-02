@@ -201,7 +201,7 @@ void PhysicalScanBase::AddCache(QueryContext *query_context,
     if (!success) {
         LOG_WARN(fmt::format("Add cache failed for query: {}", begin_ts));
     } else {
-        LOG_INFO(fmt::format("Add cache success for query: {}", begin_ts));
+        LOG_TRACE(fmt::format("Add cache success for query: {}", begin_ts));
     }
 }
 
