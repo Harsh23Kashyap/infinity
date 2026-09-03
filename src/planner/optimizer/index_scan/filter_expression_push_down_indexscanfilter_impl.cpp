@@ -112,7 +112,7 @@ struct ExpressionIndexScanInfo {
         Status status;
         if (!base_table_ref->block_index_->table_meta_) {
             base_table_ref->block_index_->table_meta_ =
-                std::make_unique<TableMeta>(table_info->db_id_, table_info->table_id_, *table_info->table_name_, new_txn);
+                std::make_unique<TableMeta>(table_info->db_id_, *table_info->db_name_, table_info->table_id_, *table_info->table_name_, new_txn);
         }
         table_meta_ = base_table_ref->block_index_->table_meta_.get();
         auto &table_index_meta_map = base_table_ref->block_index_->table_index_meta_map_;

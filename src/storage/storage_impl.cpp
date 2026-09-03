@@ -1009,7 +1009,7 @@ bool Storage::ConvertJsonIndexFormat() const {
             const std::string &table_id_str = (*table_id_strs)[j];
             const std::string &table_name = (*table_names)[j];
 
-            TableMeta table_meta(db_id_str, table_id_str, table_name, txn);
+            TableMeta table_meta(db_id_str, db_name, table_id_str, table_name, txn);
 
             std::vector<std::string> *index_id_strs = nullptr;
             std::vector<std::string> *index_names = nullptr;
