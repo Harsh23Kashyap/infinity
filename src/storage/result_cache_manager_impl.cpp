@@ -153,7 +153,7 @@ bool ResultCacheManager::AddCache(std::unique_ptr<CachedNodeBase> cached_node, s
                 LOG_WARN("Failed to append columns to cache content");
                 old_content = std::move(*new_content);
             } else {
-                LOG_INFO("Success update cache content");
+                LOG_TRACE("Success update cache content");
                 old_content = std::move(*updated_content);
             }
         };
