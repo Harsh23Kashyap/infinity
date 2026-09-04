@@ -147,6 +147,116 @@ TEST_P(DataBlockTest, test1) {
     }
 }
 
+// Regression test for the "DataBlock::Reset(capacity) silently corrupts memory when
+// capacity > originally-allocated buffer" bug. The original allocation here is
+// `row_count` rows; we then `Reset(2 * row_count)` and append `2 * row_count` rows.
+// Without the fix in ColumnVector::Initialize (the buffer is too small and writes past
+// the original allocation), this test fails on the second half of the row indices.
+TEST_P(DataBlockTest, test_reset_with_larger_capacity) {
+    using namespace infinity;
+
+    std::vector<std::shared_ptr<DataType>> column_types;
+    column_types.emplace_back(std::make_shared<DataType>(LogicalType::kTinyInt));
+    column_types.emplace_back(std::make_shared<DataType>(LogicalType::kVarchar));
+
+    constexpr size_t original_row_count = 4;
+    constexpr size_t new_row_count = 16;
+
+    DataBlock data_block;
+    data_block.Init(column_types);
+
+    // Fill the original allocation.
+    for (size_t i = 0; i < original_row_count; ++i) {
+        data_block.AppendValue(0, Value::MakeTinyInt(static_cast<i8>(i)));
+        data_block.AppendValue(1, Value::MakeVarchar(std::to_string(i)));
+    }
+
+    // Reset to a larger capacity. This was the buggy path: the column buffer was
+    // allocated for original_row_count rows but Reset(capacity) only called
+    // VectorBuffer::ResetToInit, which does not resize.
+    data_block.Reset(new_row_count);
+
+    // Append new_row_count rows (twice the original allocation).
+    for (size_t i = 0; i < new_row_count; ++i) {
+        data_block.AppendValue(0, Value::MakeTinyInt(static_cast<i8>(i + 100)));
+        data_block.AppendValue(1, Value::MakeVarchar(std::string("row_") + std::to_string(i)));
+    }
+
+    // Read all new_row_count rows back. Without the fix, rows >= original_row_count
+    // would either crash (heap corruption caught by ASan) or read garbage.
+    for (size_t i = 0; i < new_row_count; ++i) {
+        Value tiny = data_block.GetValue(0, i);
+        EXPECT_EQ(tiny.type().type(), LogicalType::kTinyInt);
+        EXPECT_EQ(tiny.value_.tiny_int, static_cast<i8>(i + 100));
+
+        Value varchar = data_block.GetValue(1, i);
+        EXPECT_EQ(varchar.type().type(), LogicalType::kVarchar);
+        EXPECT_EQ(varchar.value_.varchar.ToString(), std::string("row_") + std::to_string(i));
+    }
+}
+
+// Boundary test: Reset(capacity) where capacity equals the original allocation.
+// Exercises the no-realloc path in ColumnVector::Initialize (the existing
+// ResetToInit path is taken).
+TEST_P(DataBlockTest, test_reset_with_same_capacity) {
+    using namespace infinity;
+
+    std::vector<std::shared_ptr<DataType>> column_types;
+    column_types.emplace_back(std::make_shared<DataType>(LogicalType::kTinyInt));
+
+    constexpr size_t row_count = 8;
+
+    DataBlock data_block;
+    data_block.Init(column_types);
+    for (size_t i = 0; i < row_count; ++i) {
+        data_block.AppendValue(0, Value::MakeTinyInt(static_cast<i8>(i)));
+    }
+
+    // Reset to the same capacity.
+    data_block.Reset(row_count);
+
+    for (size_t i = 0; i < row_count; ++i) {
+        data_block.AppendValue(0, Value::MakeTinyInt(static_cast<i8>(i + 50)));
+    }
+
+    for (size_t i = 0; i < row_count; ++i) {
+        Value tiny = data_block.GetValue(0, i);
+        EXPECT_EQ(tiny.type().type(), LogicalType::kTinyInt);
+        EXPECT_EQ(tiny.value_.tiny_int, static_cast<i8>(i + 50));
+    }
+}
+
+// Boundary test: Reset(capacity) where capacity is smaller than the original
+// allocation. The buffer is not re-allocated; the existing buffer is kept and
+// just reset. Reads at row index i in [0, capacity) must succeed.
+TEST_P(DataBlockTest, test_reset_with_smaller_capacity) {
+    using namespace infinity;
+
+    std::vector<std::shared_ptr<DataType>> column_types;
+    column_types.emplace_back(std::make_shared<DataType>(LogicalType::kTinyInt));
+
+    constexpr size_t original_row_count = 8;
+    constexpr size_t new_row_count = 3;
+
+    DataBlock data_block;
+    data_block.Init(column_types);
+    for (size_t i = 0; i < original_row_count; ++i) {
+        data_block.AppendValue(0, Value::MakeTinyInt(static_cast<i8>(i)));
+    }
+
+    data_block.Reset(new_row_count);
+
+    for (size_t i = 0; i < new_row_count; ++i) {
+        data_block.AppendValue(0, Value::MakeTinyInt(static_cast<i8>(i + 200)));
+    }
+
+    for (size_t i = 0; i < new_row_count; ++i) {
+        Value tiny = data_block.GetValue(0, i);
+        EXPECT_EQ(tiny.type().type(), LogicalType::kTinyInt);
+        EXPECT_EQ(tiny.value_.tiny_int, static_cast<i8>(i + 200));
+    }
+}
+
 TEST_P(DataBlockTest, test2) {
     using namespace infinity;
 

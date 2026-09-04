@@ -55,7 +55,10 @@ public:
     // Reset to just initialized state.
     void Reset();
 
-    // TODO: May cause error when capacity is larger than the originally allocated size
+    // Reset each column with the given capacity. If `capacity` exceeds the
+    // previously-allocated buffer size, the column buffer is re-allocated
+    // (see ColumnVector::Initialize). Any previously-appended values in the
+    // columns are discarded by this call.
     void Reset(size_t capacity);
 
     [[nodiscard]] Value GetValue(size_t column_index, size_t row_index) const;

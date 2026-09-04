@@ -70,6 +70,9 @@ public:
 
     void Copy(char *input, size_t size);
 
+    [[nodiscard]] size_t data_size() const { return data_size_; }
+    [[nodiscard]] size_t capacity() const { return capacity_; }
+
     [[nodiscard]] char *GetDataMut() {
         if (std::holds_alternative<std::unique_ptr<char[]>>(ptr_)) {
             return std::get<std::unique_ptr<char[]>>(ptr_).get();
