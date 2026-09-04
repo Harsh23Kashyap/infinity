@@ -229,8 +229,21 @@ void ColumnVector::Initialize(ColumnVectorType vector_type, size_t capacity) {
         }
         data_ptr_ = buffer_->GetDataMut();
     } else {
-        // Initialize after reset will come to this branch
-        buffer_->ResetToInit(vector_buffer_type);
+        // Initialize after reset will come to this branch. If the new target size exceeds the
+        // originally-allocated buffer size (e.g. DataBlock::Reset(capacity) is called with a capacity
+        // larger than the column's prior allocation), re-allocate the buffer; otherwise just reset state.
+        // ResetToInit does not resize, so without this check writes past row `old_capacity` would corrupt
+        // memory. Any previously-appended values are discarded by this call.
+        const size_t target_size = (vector_type == ColumnVectorType::kConstant) ? 1 : capacity;
+        // Overflow-safe compare: divide the byte capacity by data_type_size_ first. The remaining buffer
+        // is sufficient iff target_size rows fit within that, i.e. target_size <= buffer_->data_size() / data_type_size_.
+        if (data_type_size_ > 0 && target_size > buffer_->data_size() / data_type_size_) {
+            buffer_ = VectorBuffer::Make(data_type_size_, target_size, vector_buffer_type);
+            nulls_ptr_ = Bitmask::MakeSharedAllTrue(target_size);
+            data_ptr_ = buffer_->GetDataMut();
+        } else {
+            buffer_->ResetToInit(vector_buffer_type);
+        }
     }
 }
 
