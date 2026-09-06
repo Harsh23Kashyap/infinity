@@ -124,7 +124,7 @@ Status Status::InsufficientPrivilege(const std::string &user_name, const std::st
 Status Status::UnsupportedVersionIndex(i64 given_index, i64 max_index) {
     return Status(ErrorCode::kUnsupportedVersionIndex,
                   std::make_unique<std::string>(fmt::format(
-                      "Client version inndex: {} isn't supported, current max SDK version index is {}. Please install the corresponding version SDK.",
+                      "Client version index: {} isn't supported, current max SDK version index is {}. Please install the corresponding version SDK.",
                       given_index,
                       max_index)));
 }
