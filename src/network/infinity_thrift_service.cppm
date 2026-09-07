@@ -61,9 +61,18 @@ struct ClientVersions {
 };
 
 export class InfinityThriftService final : public infinity_thrift_rpc::InfinityServiceIf {
+    // ClientVersions is defined in the same translation unit and needs to read
+    // kCurrentMaxVersionIndex for the drift check; grant it friend access rather
+    // than widening the public API surface.
+    friend struct ClientVersions;
+
 private:
+    // Bump this when adding a new client version to ClientVersions::client_version_map_.
+    // The ClientVersions constructor asserts that this matches client_version_map_.rbegin()->first
+    // via UnrecoverableError at server startup, so a forgotten bump fails loudly before any client connects.
+    static constexpr i64 kCurrentMaxVersionIndex = 36; // 0.7.2
+
     static constexpr std::string_view ErrorMsgHeader = "[THRIFT ERROR]";
-    static constexpr i64 current_version_index_{36}; // 0.7.2
 
     static std::mutex infinity_session_map_mutex_;
     static std::unordered_map<u64, std::shared_ptr<Infinity>> infinity_session_map_;
