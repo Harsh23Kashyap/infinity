@@ -107,6 +107,22 @@ ClientVersions::ClientVersions() {
     client_version_map_[34] = std::string("0.6.13");
     client_version_map_[35] = std::string("0.6.15");
     client_version_map_[36] = std::string("0.7.2");
+
+    // Assert that the map's max key matches the canonical constant.
+    // If a developer adds a new client version to the map but forgets to bump
+    // kCurrentMaxVersionIndex in infinity_thrift_service.cppm, the server will
+    // fail to start with an UnrecoverableError — rather than confusingly rejecting
+    // clients using the new version at connect time.
+    if (client_version_map_.empty()) {
+        UnrecoverableError("ClientVersions: client_version_map_ is empty after initialization");
+    }
+    i64 max_key = client_version_map_.rbegin()->first;
+    if (max_key != InfinityThriftService::kCurrentMaxVersionIndex) {
+        UnrecoverableError(fmt::format(
+            "ClientVersions: client_version_map_ max key ({}) does not match kCurrentMaxVersionIndex ({}). "
+            "When adding a new client version, bump kCurrentMaxVersionIndex in infinity_thrift_service.cppm.",
+            max_key, InfinityThriftService::kCurrentMaxVersionIndex));
+    }
 }
 
 std::pair<const char *, Status> ClientVersions::GetVersionByIndex(i64 version_index) {
@@ -130,7 +146,7 @@ u32 InfinityThriftService::ClearSessionMap() {
 
 void InfinityThriftService::Connect(infinity_thrift_rpc::CommonResponse &response, const infinity_thrift_rpc::ConnectRequest &request) {
     i64 request_client_version = request.client_version;
-    if (request_client_version != current_version_index_) {
+    if (request_client_version != kCurrentMaxVersionIndex) {
         auto [request_version_ptr, status1] = client_version_.GetVersionByIndex(request_client_version);
         if (!status1.ok()) {
             response.__set_error_code(static_cast<i64>(status1.code()));
@@ -139,7 +155,7 @@ void InfinityThriftService::Connect(infinity_thrift_rpc::CommonResponse &respons
             return;
         }
 
-        auto [expected_version_ptr, status2] = client_version_.GetVersionByIndex(current_version_index_);
+        auto [expected_version_ptr, status2] = client_version_.GetVersionByIndex(kCurrentMaxVersionIndex);
         if (!status2.ok()) {
             UnrecoverableError(status2.message());
         }
