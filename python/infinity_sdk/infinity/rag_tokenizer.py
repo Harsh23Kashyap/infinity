@@ -25,7 +25,6 @@
 # ]
 # ///
 
-import logging
 # logging.basicConfig(
 #     level=logging.INFO,
 #     format='%(asctime)s - %(levelname)s - %(message)s',
@@ -33,15 +32,16 @@ import logging
 # )
 import argparse
 import copy
-import datrie
+import logging
 import math
 import os
 import re
 import string
+
+import datrie
 from hanziconv import HanziConv
 from nltk import word_tokenize
 from nltk.stem import SnowballStemmer, WordNetLemmatizer
-
 
 # Map language names (lowercase) to NLTK SnowballStemmer language names.
 # Used by set_language() to configure language-specific stemming.
@@ -307,7 +307,7 @@ class RagTokenizer:
             tks.append(tk)
         # F /= len(tks)
         L /= len(tks)
-        logging.debug("[SC] {} {} {} {} {}".format(tks, len(tks), L, F, B / len(tks) + L + F))
+        logging.debug(f"[SC] {tks} {len(tks)} {L} {F} {B / len(tks) + L + F}")
         return tks, B / len(tks) + L + F
 
     def _sort_tokens(self, tkslist):
@@ -439,8 +439,8 @@ class RagTokenizer:
             tks, s = self._max_forward(L)
             tks1, s1 = self._max_backward(L)
             if self.DEBUG:
-                logging.debug("[FW] {} {}".format(tks, s))
-                logging.debug("[BW] {} {}".format(tks1, s1))
+                logging.debug(f"[FW] {tks} {s}")
+                logging.debug(f"[BW] {tks1} {s1}")
 
             i, j, _i, _j = 0, 0, 0, 0
             same = 0
@@ -488,7 +488,7 @@ class RagTokenizer:
                 res.append(" ".join(self._sort_tokens(tkslist)[0][0]))
 
         res = " ".join(res)
-        logging.debug("[TKS] {}".format(self.merge_(res)))
+        logging.debug(f"[TKS] {self.merge_(res)}")
         return self.merge_(res)
 
     def fine_grained_tokenize(self, tks: str) -> str:
@@ -626,7 +626,7 @@ if __name__ == '__main__':
             results.append(result)
 
         except Exception as e:
-            error_msg = f"ERROR: {str(e)}"
+            error_msg = f"ERROR: {e!s}"
             logging.error(f"Failed to process text: {text} - {e}")
             results.append(error_msg)
 

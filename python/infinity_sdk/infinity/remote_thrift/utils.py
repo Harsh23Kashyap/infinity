@@ -12,20 +12,22 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import re
 import functools
 import inspect
+import re
 from typing import Any
+
+import numpy as np
 import pandas as pd
 import polars as pl
-from sqlglot import condition
 import sqlglot.expressions as exp
-import numpy as np
-import infinity.remote_thrift.infinity_thrift_rpc.ttypes as ttypes
+from sqlglot import condition
+
+from infinity.common import Array, InfinityException, SparseVector
+from infinity.errors import ErrorCode
+from infinity.remote_thrift.infinity_thrift_rpc import ttypes
 from infinity.remote_thrift.types import build_result, logic_type_to_dtype
 from infinity.utils import binary_exp_to_paser_exp
-from infinity.common import InfinityException, SparseVector, Array
-from infinity.errors import ErrorCode
 
 
 def map_sqlglot_type_to_infinity_type(type_name: str) -> ttypes.DataType:
@@ -85,7 +87,7 @@ def column_expr_to_string(column_expr: ttypes.ColumnExpr) -> str:
 
 def parsed_expression_to_string(expr: ttypes.ParsedExpr) -> str:
     if expr is None:
-        return str()
+        return ''
 
     expr_type = expr.type
     if expr_type.constant_expr:
@@ -303,6 +305,50 @@ def traverse_conditions(cons: exp.Condition, fn=None) -> ttypes.ParsedExpr:
         return _parse_like(cons, None)
     elif isinstance(cons, exp.Not) and isinstance(cons.args['this'], exp.Like):
         return _parse_not_like(cons.args['this'], None)
+    elif isinstance(cons, exp.Is):
+        # Handle IS [NOT] NULL / IS [NOT] TRUE / IS [NOT] FALSE / IS [NOT] UNKNOWN.
+        # sqlglot parses all of these as exp.Is nodes.
+        # Only IS NULL and IS NOT NULL are supported; others must be rejected.
+        if not isinstance(cons.args.get('expression'), exp.Null):
+            raise InfinityException(ErrorCode.INVALID_EXPRESSION,
+                                    f"Unsupported IS expression: {cons}. Only IS NULL / IS NOT NULL are supported.")
+        # Handle IS NULL: exp.Is(this=col, expression=Null())
+        parsed_expr = ttypes.ParsedExpr()
+        function_expr = ttypes.FunctionExpr()
+        function_expr.function_name = "is_null"
+        arguments = []
+        if fn:
+            expr = fn(cons.this)
+        else:
+            expr = traverse_conditions(cons.this)
+        arguments.append(expr)
+        function_expr.arguments = arguments
+        parser_expr_type = ttypes.ParsedExprType()
+        parser_expr_type.function_expr = function_expr
+        parsed_expr.type = parser_expr_type
+        return parsed_expr
+    elif isinstance(cons, exp.Not) and isinstance(cons.args['this'], exp.Is):
+        # Handle IS NOT NULL / IS NOT TRUE / IS NOT FALSE / IS NOT UNKNOWN.
+        # Only IS NOT NULL is supported; others must be rejected.
+        inner_is = cons.args['this']
+        if not isinstance(inner_is.args.get('expression'), exp.Null):
+            raise InfinityException(ErrorCode.INVALID_EXPRESSION,
+                                    f"Unsupported IS expression: {cons}. Only IS NULL / IS NOT NULL are supported.")
+        # Handle IS NOT NULL: exp.Not(this=exp.Is(this=col, expression=Null()))
+        parsed_expr = ttypes.ParsedExpr()
+        function_expr = ttypes.FunctionExpr()
+        function_expr.function_name = "is_not_null"
+        arguments = []
+        if fn:
+            expr = fn(inner_is.this)
+        else:
+            expr = traverse_conditions(inner_is.this)
+        arguments.append(expr)
+        function_expr.arguments = arguments
+        parser_expr_type = ttypes.ParsedExprType()
+        parser_expr_type.function_expr = function_expr
+        parsed_expr.type = parser_expr_type
+        return parsed_expr
     elif isinstance(cons, exp.Binary):
         parsed_expr = ttypes.ParsedExpr()
         function_expr = ttypes.FunctionExpr()
@@ -672,6 +718,9 @@ def get_remote_constant_expr_from_python_value(value) -> ttypes.ConstantExpr:
         else:
             raise InfinityException(ErrorCode.INVALID_EXPRESSION,
                                     f"Invalid list member type: {type(value[0])}, ndarray dimension > 2")
+    elif isinstance(value, list) and len(value) > 0:
+        # Normalize numpy scalars in list to native Python types (element-wise check)
+        value = [x.item() if isinstance(x, (np.integer, np.floating, np.longdouble)) else x for x in value]
     elif isinstance(value, np.ndarray):
         if value.ndim <= 2:
             value = value.tolist()
@@ -682,6 +731,8 @@ def get_remote_constant_expr_from_python_value(value) -> ttypes.ConstantExpr:
     match value:
         case str():
             constant_expression = ttypes.ConstantExpr(literal_type=ttypes.LiteralType.String, str_value=value)
+        case None:
+            constant_expression = ttypes.ConstantExpr(literal_type=ttypes.LiteralType.Null)
         case bool():
             constant_expression = ttypes.ConstantExpr(literal_type=ttypes.LiteralType.Boolean, bool_value=value)
         case int():

@@ -107,12 +107,13 @@ ClientVersions::ClientVersions() {
     client_version_map_[34] = std::string("0.6.13");
     client_version_map_[35] = std::string("0.6.15");
     client_version_map_[36] = std::string("0.7.2");
+    client_version_map_[37] = std::string("0.7.3");
 }
 
 std::pair<const char *, Status> ClientVersions::GetVersionByIndex(i64 version_index) {
     auto iter = client_version_map_.find(version_index);
     if (iter == client_version_map_.end()) {
-        return {nullptr, Status::UnsupportedVersionIndex(version_index)};
+        return {nullptr, Status::UnsupportedVersionIndex(version_index, 37)}; // Index for 0.7.3
     }
     return {iter->second.c_str(), Status::OK()};
 }
@@ -3255,6 +3256,11 @@ void InfinityThriftService::HandleArrayType(infinity_thrift_rpc::ColumnField &ou
     auto *array_data_ptr = reinterpret_cast<const ArrayT *>(column_vector->data());
     std::string dst;
     for (size_t index = 0; index < row_count; ++index) {
+        if (!column_vector->nulls_ptr_->IsTrue(index)) {
+            const i32 element_cnt = 0;
+            dst.append(reinterpret_cast<const char *>(&element_cnt), sizeof(i32));
+            continue;
+        }
         HandleArrayTypeRecursively(dst, column_data_type, array_data_ptr[index], column_vector);
     }
     output_column_field.column_vectors.emplace_back(std::move(dst));
@@ -3293,6 +3299,11 @@ void InfinityThriftService::HandleVarcharType(infinity_thrift_rpc::ColumnField &
     const auto varchar_ptr = reinterpret_cast<const VarcharT *>(column_vector->data());
     const auto &varchar_type = *column_vector->data_type();
     for (size_t i = 0; i < row_count; ++i) {
+        if (!column_vector->nulls_ptr_->IsTrue(i)) {
+            const i32 length = 0;
+            dst.append(reinterpret_cast<const char *>(&length), sizeof(i32));
+            continue;
+        }
         HandleArrayTypeRecursively(dst, varchar_type, varchar_ptr[i], column_vector);
     }
     output_column_field.column_vectors.emplace_back(std::move(dst));
@@ -3306,6 +3317,11 @@ void InfinityThriftService::HandleJsonType(infinity_thrift_rpc::ColumnField &out
     const auto json_ptr = reinterpret_cast<const JsonT *>(column_vector->data());
     const auto &json_type = *column_vector->data_type();
     for (size_t i = 0; i < row_count; ++i) {
+        if (!column_vector->nulls_ptr_->IsTrue(i)) {
+            const i32 length = 0;
+            dst.append(reinterpret_cast<const char *>(&length), sizeof(i32));
+            continue;
+        }
         HandleArrayTypeRecursively(dst, json_type, json_ptr[i], column_vector);
     }
     output_column_field.column_vectors.emplace_back(std::move(dst));
@@ -3342,6 +3358,11 @@ void InfinityThriftService::HandleMultiVectorType(infinity_thrift_rpc::ColumnFie
     const auto mv_ptr = reinterpret_cast<const MultiVectorT *>(column_vector->data());
     const auto &mv_type = *column_vector->data_type();
     for (size_t i = 0; i < row_count; ++i) {
+        if (!column_vector->nulls_ptr_->IsTrue(i)) {
+            const i32 length = 0;
+            dst.append(reinterpret_cast<const char *>(&length), sizeof(i32));
+            continue;
+        }
         HandleArrayTypeRecursively(dst, mv_type, mv_ptr[i], column_vector);
     }
     output_column_field.column_vectors.emplace_back(std::move(dst));
@@ -3367,6 +3388,11 @@ void InfinityThriftService::HandleTensorType(infinity_thrift_rpc::ColumnField &o
     const auto tensor_ptr = reinterpret_cast<const TensorT *>(column_vector->data());
     const auto &tensor_type = *column_vector->data_type();
     for (size_t i = 0; i < row_count; ++i) {
+        if (!column_vector->nulls_ptr_->IsTrue(i)) {
+            const i32 length = 0;
+            dst.append(reinterpret_cast<const char *>(&length), sizeof(i32));
+            continue;
+        }
         HandleArrayTypeRecursively(dst, tensor_type, tensor_ptr[i], column_vector);
     }
     output_column_field.column_vectors.emplace_back(std::move(dst));
@@ -3397,6 +3423,11 @@ void InfinityThriftService::HandleTensorArrayType(infinity_thrift_rpc::ColumnFie
     const auto tensor_array_ptr = reinterpret_cast<const TensorArrayT *>(column_vector->data());
     const auto &tensor_array_type = *column_vector->data_type();
     for (size_t i = 0; i < row_count; ++i) {
+        if (!column_vector->nulls_ptr_->IsTrue(i)) {
+            const i32 tensor_num = 0;
+            dst.append(reinterpret_cast<const char *>(&tensor_num), sizeof(i32));
+            continue;
+        }
         HandleArrayTypeRecursively(dst, tensor_array_type, tensor_array_ptr[i], column_vector);
     }
     output_column_field.column_vectors.emplace_back(std::move(dst));
@@ -3431,6 +3462,11 @@ void InfinityThriftService::HandleSparseType(infinity_thrift_rpc::ColumnField &o
     const auto sparse_ptr = reinterpret_cast<const SparseT *>(column_vector->data());
     const auto &sparse_type = *column_vector->data_type();
     for (size_t i = 0; i < row_count; ++i) {
+        if (!column_vector->nulls_ptr_->IsTrue(i)) {
+            const i32 nnz = 0;
+            dst.append(reinterpret_cast<const char *>(&nnz), sizeof(i32));
+            continue;
+        }
         HandleArrayTypeRecursively(dst, sparse_type, sparse_ptr[i], column_vector);
     }
     output_column_field.column_vectors.emplace_back(std::move(dst));
