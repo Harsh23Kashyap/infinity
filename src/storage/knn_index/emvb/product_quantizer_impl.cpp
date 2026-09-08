@@ -196,22 +196,22 @@ void OPQ<SUBSPACE_CENTROID_TAG, SUBSPACE_NUM>::Train(const f32 *embedding_data, 
         {
             std::ostringstream oss;
             oss << "OPQ loop: " << i << ", train time: " << std::chrono::duration_cast<std::chrono::duration<float, std::milli>>(time_1 - time_0);
-            LOG_INFO(std::move(oss).str());
+            LOG_TRACE(std::move(oss).str());
         }
         // update R
         PQ_BASE::EncodeEmbedding(transformed_embedding.get(), embedding_num, encoded_transformed.get());
         const auto decoded_encoded = PQ_BASE::DecodeEmbedding(encoded_transformed.get(), embedding_num); // embedding_num * dimension_
         {
             const auto rotate_error = L2Distance<f32>(transformed_embedding.get(), decoded_encoded.get(), embedding_num * this->dimension_);
-            LOG_INFO(fmt::format("OPQ loop: {}, encode_decode error: {}", i, rotate_error));
-            LOG_INFO(fmt::format("OPQ loop: {}, encode_decode error avg: {}", i, rotate_error / (embedding_num * this->dimension_)));
+            LOG_TRACE(fmt::format("OPQ loop: {}, encode_decode error: {}", i, rotate_error));
+            LOG_TRACE(fmt::format("OPQ loop: {}, encode_decode error avg: {}", i, rotate_error / (embedding_num * this->dimension_)));
         }
         const auto time_2 = std::chrono::high_resolution_clock::now();
         {
             std::ostringstream oss;
             oss << "OPQ loop: " << i
                 << ", encode_decode time: " << std::chrono::duration_cast<std::chrono::duration<float, std::milli>>(time_2 - time_1);
-            LOG_INFO(std::move(oss).str());
+            LOG_TRACE(std::move(oss).str());
         }
         transpose_matrixA_multiply_matrixB_output_to_C(embedding_data,
                                                        decoded_encoded.get(),
@@ -233,13 +233,13 @@ void OPQ<SUBSPACE_CENTROID_TAG, SUBSPACE_NUM>::Train(const f32 *embedding_data, 
         {
             std::ostringstream oss;
             oss << "OPQ loop: " << i << ", svd time: " << std::chrono::duration_cast<std::chrono::duration<float, std::milli>>(time_3 - time_2);
-            LOG_INFO(std::move(oss).str());
+            LOG_TRACE(std::move(oss).str());
         }
         {
             const auto R_diff = L2Distance<f32>(old_R.get(), matrix_R_.get(), this->dimension_ * this->dimension_);
-            LOG_INFO(fmt::format("OPQ loop: {}, old R diff: {}", i, R_diff));
+            LOG_TRACE(fmt::format("OPQ loop: {}, old R diff: {}", i, R_diff));
             const auto L2Norm = L2NormSquare<f32>(matrix_R_.get(), this->dimension_ * this->dimension_);
-            LOG_INFO(fmt::format("OPQ loop: {}, R L2Norm: {}", i, L2Norm));
+            LOG_TRACE(fmt::format("OPQ loop: {}, R L2Norm: {}", i, L2Norm));
         }
     }
     {
