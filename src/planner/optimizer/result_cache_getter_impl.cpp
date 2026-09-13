@@ -102,9 +102,9 @@ void ResultCacheGetter::ApplyToPlan(QueryContext *query_context_ptr, std::shared
             }
         }
         if (!cache_output.has_value()) {
-            LOG_INFO(fmt::format("No cache found for match node {}", op->node_id()));
+            LOG_TRACE(fmt::format("No cache found for match node {}", op->node_id()));
         } else {
-            LOG_INFO(fmt::format("Cache found for match node {}", op->node_id()));
+            LOG_TRACE(fmt::format("Cache found for match node {}", op->node_id()));
             auto logical_read_cache = std::make_shared<LogicalReadCache>(op->node_id(),
                                                                          op->operator_type(),
                                                                          base_table_ref,

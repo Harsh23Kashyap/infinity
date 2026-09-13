@@ -969,7 +969,7 @@ private:
                                                       default_field,
                                                       static_cast<int>(query_operator_option)));
                             } else {
-                                LOG_INFO("Empty query tree");
+                                LOG_TRACE("Empty query tree");
                             }
                         }
                     }
