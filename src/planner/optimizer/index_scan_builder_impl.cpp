@@ -58,7 +58,7 @@ public:
                 if (op->right_node().get() != nullptr) {
                     UnrecoverableError("BuildSecondaryIndexScan: Logical filter node shouldn't have right child.");
                 } else if (op->left_node()->operator_type() != LogicalNodeType::kTableScan) {
-                    LOG_INFO("BuildSecondaryIndexScan: The left child of Logical filter is not table scan. Cannot push down filter. Need to fix.");
+                    LOG_TRACE("BuildSecondaryIndexScan: The left child of Logical filter is not table scan. Cannot push down filter. Need to fix.");
                 } else {
                     auto &filter = static_cast<LogicalFilter &>(*op);
                     auto &filter_expression = filter.expression();
