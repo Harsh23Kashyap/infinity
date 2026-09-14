@@ -156,25 +156,6 @@ void OPQ<SUBSPACE_CENTROID_TAG, SUBSPACE_NUM>::Train(const f32 *embedding_data, 
     // step 2. train R for iter_cnt times
     const auto transformed_embedding = std::make_unique_for_overwrite<f32[]>(embedding_num * this->dimension_);
     const auto encoded_transformed = std::make_unique_for_overwrite<std::array<SUBSPACE_CENTROID_TAG, SUBSPACE_NUM>[]>(embedding_num);
-    if constexpr (false) {
-        // TODO: Fix svd, and remove this code block.
-        matrixA_multiply_matrixB_output_to_C(embedding_data,
-                                             matrix_R_.get(),
-                                             embedding_num,
-                                             this->dimension_,
-                                             this->dimension_,
-                                             transformed_embedding.get());
-        PQ_BASE::Train(transformed_embedding.get(), embedding_num, iter_cnt);
-        // diff
-        {
-            PQ_BASE::EncodeEmbedding(transformed_embedding.get(), embedding_num, encoded_transformed.get());
-            const auto decoded_encoded = PQ_BASE::DecodeEmbedding(encoded_transformed.get(), embedding_num); // embedding_num * dimension_
-            const auto rotate_error = L2Distance<f32>(transformed_embedding.get(), decoded_encoded.get(), embedding_num * this->dimension_);
-            LOG_INFO(fmt::format("OPQ encode_decode error: {}", rotate_error));
-            LOG_INFO(fmt::format("OPQ encode_decode error avg: {}", rotate_error / (embedding_num * this->dimension_)));
-        }
-        return;
-    }
     const auto square_for_svd = std::make_unique_for_overwrite<f32[]>(this->dimension_ * this->dimension_);
     const auto svd_u = std::make_unique_for_overwrite<f32[]>(this->dimension_ * this->dimension_);
     const auto svd_v = std::make_unique_for_overwrite<f32[]>(this->dimension_ * this->dimension_);
