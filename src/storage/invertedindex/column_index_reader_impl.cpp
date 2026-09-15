@@ -64,7 +64,7 @@ Status ColumnIndexReader::Open(optionflag_t flag, TableIndexMeta &table_index_me
     }
     if (segment_ids_ptr->empty()) {
         KVInstance &kv_instance = table_index_meta.kv_instance();
-        LOG_INFO(fmt::format("All kv_instance key and value: {}", kv_instance.ToString()));
+        LOG_TRACE(fmt::format("All kv_instance key and value: {}", kv_instance.ToString()));
     }
     // need to ensure that segment_id is in ascending order
     for (SegmentID segment_id : *segment_ids_ptr) {
@@ -125,12 +125,12 @@ Status ColumnIndexReader::Open(optionflag_t flag, TableIndexMeta &table_index_me
         }
     }
     if (memory_indexers_.size() > 1) {
-        LOG_INFO(fmt::format("Memory indexers size: {}", memory_indexers_.size()));
+        LOG_TRACE(fmt::format("Memory indexers size: {}", memory_indexers_.size()));
         for (const auto &memory_indexer : memory_indexers_) {
             if (memory_indexer != nullptr) {
                 auto [doc_cnt, term_cnt] = memory_indexer->GetDocTermCount();
                 RowID base_rowid = memory_indexer->GetBeginRowID();
-                LOG_INFO(fmt::format("Memory_indexer base_rowid: {}, doc_cnt: {}, term_cnt: {}", base_rowid.ToUint64(), doc_cnt, term_cnt));
+                LOG_TRACE(fmt::format("Memory_indexer base_rowid: {}, doc_cnt: {}, term_cnt: {}", base_rowid.ToUint64(), doc_cnt, term_cnt));
             }
         }
     }
