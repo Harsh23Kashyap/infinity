@@ -34,6 +34,7 @@ module;
 
 #endif
 
+#include <cstring>
 #include <dirent.h>
 #include <unistd.h>
 
@@ -309,6 +310,15 @@ i64 SystemInfo::MemoryUsage() {
         vm_rss_in_kb = get_memory();
 #elif defined(linux) || defined(__linux) || defined(__linux__)
         FILE *file = fopen("/proc/self/status", "r");
+        if (file == nullptr) {
+            // /proc/self/status can be unavailable in containers, sandboxes,
+            // chroots without /proc, or under restrictive SELinux policies.
+            // fclose(nullptr) is undefined behavior per POSIX; the existing
+            // try/catch below propagates the resulting recoverable error.
+            const int open_errno = errno;
+            RecoverableError(Status::FailToGetSysInfo(fmt::format("Can't open /proc/self/status: {}",
+                                                                          std::strerror(open_errno))));
+        }
         DeferFn defer_fn([&] { fclose(file); });
 
         constexpr i64 line_length = 128;
