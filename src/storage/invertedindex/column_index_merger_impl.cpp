@@ -152,10 +152,10 @@ void ColumnIndexMerger::Merge(const std::vector<std::string> &base_names, const 
     posting_file_writer_->Sync();
     fst_builder.Finish();
 
-    LOG_INFO(fmt::format("Merge from FST file: {}, to DICT file: {}", tmp_fst_file, tmp_dict_file));
+    LOG_TRACE(fmt::format("Merge from FST file: {}, to DICT file: {}", tmp_fst_file, tmp_dict_file));
     VirtualStore::Merge(tmp_dict_file, tmp_fst_file);
 
-    LOG_INFO(fmt::format("Delete FST file: {}", tmp_fst_file));
+    LOG_TRACE(fmt::format("Delete FST file: {}", tmp_fst_file));
     VirtualStore::DeleteFile(tmp_fst_file);
     if (use_object_cache) {
         PersistResultHandler handler(pm);
