@@ -1,0 +1,68 @@
+# Regression for #22: ValueSet::TryPut segfaults on typed-NULL VARCHAR.
+#
+# The kVarchar branch of ValueHasher::operator() in src/expression/in_expression.cppm
+# used to call val.GetVarchar() unconditionally. GetVarchar() returns
+# value_info_->Get<StringValueInfo>().GetString(), which segfaults when value_info_
+# is null. Typed-NULL VARCHAR Values (returned by ColumnVector::GetValueByIndex for
+# a NULL cell, or by CAST(NULL AS VARCHAR) through the cast path) have a null
+# value_info_; putting one into the ValueSet called set_.emplace, which invoked
+# ValueHasher, which deref'd the null shared_ptr.
+#
+# Fix: hash a typed-NULL VARCHAR to 0 (a fixed sentinel) so all NULL VARCHARs share
+# a bucket. Consistent with ValueComparator treating both-nulls as equal after PR
+# #11, and with ValueSet::Exist short-circuiting on NULL after PR #9.
+#
+# Pre-fix: each of the queries below SIGSEGVs the server in ValueHasher.
+# Post-fix: NULL IN (...) is UNKNOWN (never matches), per SQL semantics; the IN
+# list with only NULL returns zero rows, the mixed list returns the non-NULL matches.
+
+statement ok
+DROP TABLE IF EXISTS test_in_set_hasher_null;
+
+statement ok
+CREATE TABLE test_in_set_hasher_null(id INTEGER, name VARCHAR);
+
+statement ok
+INSERT INTO test_in_set_hasher_null VALUES
+(1, 'Tom'),
+(2, 'Henry'),
+(3, NULL),
+(4, 'james');
+
+# Bare NULL in the IN list: used to crash in ValueHasher via the cast path
+# (NULL literal is type kNull, cast to VARCHAR -> typed-NULL VARCHAR -> emplace).
+# Post-fix: SQL NULL is UNKNOWN -> no row matches a NULL IN-list element.
+query IT
+SELECT id, name FROM test_in_set_hasher_null WHERE name IN (NULL) ORDER BY id;
+----
+
+# Explicit CAST(NULL AS VARCHAR) takes the same cast path with the same NULL
+# VARCHAR result. Same expectation: no crash, zero rows.
+query IT
+SELECT id, name FROM test_in_set_hasher_null WHERE name IN (CAST(NULL AS VARCHAR)) ORDER BY id;
+----
+
+# Mixed: NULL plus real literals. PR #9 short-circuits Exist() on a NULL left
+# operand, so row 3 (name=NULL) is correctly excluded. The non-NULL rows match
+# the literal members per ValueSet semantics.
+query IT
+SELECT id, name FROM test_in_set_hasher_null WHERE name IN (NULL, 'Tom', 'Henry') ORDER BY id;
+----
+1 Tom
+2 Henry
+
+# Mirror: NOT IN with a NULL-set member. SQL: NULL IN (...) is UNKNOWN, so NOT IN
+# with a NULL set member returns UNKNOWN for every row, which means no row passes
+# the filter. This was the original crash site and must remain stable post-fix.
+query IT
+SELECT id, name FROM test_in_set_hasher_null WHERE name NOT IN (NULL) ORDER BY id;
+----
+
+# Constant NULL on the left side (different code path -- PR #21's kConstant
+# branch). Make sure the fix here doesn't disturb the already-handled path.
+query IT
+SELECT id, name FROM test_in_set_hasher_null WHERE CAST(NULL AS VARCHAR) IN ('Tom', 'Henry') ORDER BY id;
+----
+
+statement ok
+DROP TABLE test_in_set_hasher_null;
