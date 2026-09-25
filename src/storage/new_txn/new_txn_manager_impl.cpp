@@ -67,23 +67,24 @@ void NewTxnManager::Start() {
 }
 
 void NewTxnManager::Stop() {
-    if (!is_running_) {
-        // FIXME: protect the double stop, the double stop need to be fixed.
-        LOG_INFO("WAL manager was stopped...");
-        return;
-    }
-
-    txn_allocator_->Stop();
-    txn_allocator_.reset();
-
+    // CAS-first: only the winning thread runs the cleanup. The previous code
+    // did a plain read of is_running_ and ran txn_allocator_->Stop() before
+    // the CAS, which let two concurrent Stop() calls both enter the cleanup
+    // path and double-call TxnAllocator::Stop() (which is not idempotent --
+    // it enqueues a nullptr sentinel and joins the worker thread, so the
+    // second Wait() blocks forever). Same pattern as WalManager::Stop.
     bool expected = true;
-    bool changed = is_running_.compare_exchange_strong(expected, false);
-    if (!changed) {
-        LOG_INFO("NewTxnManager::Stop already stopped");
+    if (!is_running_.compare_exchange_strong(expected, false)) {
+        // Already stopped, or another thread won the race. Only the winning
+        // thread runs the cleanup below; the loser returns immediately.
+        LOG_INFO("NewTxnManager is already stopped");
         return;
     }
 
     LOG_INFO("NewTxn manager is stopping...");
+    txn_allocator_->Stop();
+    txn_allocator_.reset();
+
     std::unique_lock<std::mutex> w_locker(locker_);
     auto it = txn_map_.begin();
     while (it != txn_map_.end()) {
