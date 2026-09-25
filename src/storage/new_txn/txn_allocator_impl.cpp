@@ -34,12 +34,19 @@ TxnAllocator::~TxnAllocator() = default;
 void TxnAllocator::SetSystemCache(SystemCache *system_cache) { system_cache_ = system_cache; }
 
 void TxnAllocator::Start() {
+    is_running_.store(true, std::memory_order::relaxed);
     processor_thread_ = std::thread([this] { Process(); });
     LOG_INFO("Transaction allocator is started.");
 }
 
 void TxnAllocator::Stop() {
-    LOG_INFO("Transaction allocator is stopping.");
+    LOG_INFO("Transaction allocator is stopping...");
+    bool expected = true;
+    bool changed = is_running_.compare_exchange_strong(expected, false);
+    if (!changed) {
+        LOG_INFO("Transaction allocator is already stopped");
+        return;
+    }
     std::shared_ptr<TxnAllocatorTask> stop_task = std::make_shared<TxnAllocatorTask>(nullptr, true);
     task_queue_.Enqueue(stop_task);
     stop_task->Wait();

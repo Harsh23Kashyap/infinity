@@ -44,6 +44,7 @@ private:
 
     Storage *storage_{};
 
+    std::atomic<bool> is_running_{false};
     std::atomic<u64> task_count_{};
 
     SystemCache *system_cache_{};
