@@ -1,0 +1,141 @@
+# name: test/sql/dql/type/json_value_from_bson_null.slt
+# description: Value/cast/export/unnest must not segfault on NULL JSON rows
+# group: [dql, type]
+
+# Companion to json_extract_null.slt and json_contains_null.slt.
+# PR #15 guards the json_extract_* / json_exists_path / json_extract_isnull
+# family via the JsonExtractor<>::Execute template. PR #13 guards the 2-arg
+# json_contains. This SLT covers the remaining from_bson null-safety work:
+#
+#   Value::ToString                 (result-set display)
+#   Value::AppendToJson             (export -> JSONL)
+#   Value::AppendToArrowArray       (export -> Parquet)
+#   ColumnVector::GetValueAsString  (column-level stringification)
+#   TryCastJson<JsonT, VarcharT>   (CAST(json AS varchar))
+#   Thrift HandleArrayTypeRecursively (RPC response)
+#   ColumnVector::AppendUnnestJson  (UNNEST over JSON)
+
+statement ok
+DROP TABLE IF EXISTS test_json_value_from_bson_null;
+
+statement ok
+CREATE TABLE test_json_value_from_bson_null (id INT, meta JSON);
+
+statement ok
+INSERT INTO test_json_value_from_bson_null VALUES (1, NULL), (2, '{"val": 42, "flag": true, "name": "ok"}');
+
+# 1. SELECT must not crash on a NULL JSON row. Before the fix,
+#    Value::ToString / ColumnVector::GetValueAsString dereferenced
+#    a null JsonTypeDef returned by from_bson.
+query T rowsort
+SELECT CAST(meta AS VARCHAR) FROM test_json_value_from_bson_null;
+----
+null
+{"flag": true, "name": "ok", "val": 42}
+
+# 2. CAST(json AS varchar) directly exercises TryCastJson. Before the
+#    fix this segfaulted on the NULL row.
+query T rowsort
+SELECT CAST(meta AS VARCHAR) FROM test_json_value_from_bson_null WHERE id = 1;
+----
+null
+
+query T rowsort
+SELECT CAST(meta AS VARCHAR) FROM test_json_value_from_bson_null WHERE id = 2;
+----
+{"flag": true, "name": "ok", "val": 42}
+
+# 3. UNNEST on a NULL JSON row must return zero rows, not crash.
+#    Exercises ColumnVector::AppendUnnestJson.
+query I
+SELECT UNNEST(meta) FROM test_json_value_from_bson_null WHERE id = 1;
+----
+
+query I
+SELECT UNNEST(meta) FROM test_json_value_from_bson_null WHERE id = 2;
+----
+42
+true
+"ok"
+
+statement ok
+DROP TABLE IF EXISTS test_json_value_from_bson_null;
+
+# 4. EXPORT must round-trip a NULL JSON row. Exercises Value::AppendToJson
+#    (JSONL), Value::AppendToArrowArray (Parquet), and the Thrift
+#    HandleArrayTypeRecursively<JsonT> serialization path. Before the fix
+#    every export path segfaulted on the typed-null JSON row.
+statement ok
+DROP TABLE IF EXISTS test_json_value_from_bson_null_export;
+
+statement ok
+CREATE TABLE test_json_value_from_bson_null_export (id INT, meta JSON);
+
+statement ok
+INSERT INTO test_json_value_from_bson_null_export VALUES (1, NULL), (2, '{"k": 1}');
+
+statement ok
+COPY test_json_value_from_bson_null_export TO '/var/infinity/test_data/tmp/test_json_value_from_bson_null_export.csv' WITH (FORMAT CSV, DELIMITER ',');
+
+statement ok
+COPY test_json_value_from_bson_null_export TO '/var/infinity/test_data/tmp/test_json_value_from_bson_null_export.jsonl' WITH (FORMAT JSONL);
+
+statement ok
+COPY test_json_value_from_bson_null_export TO '/var/infinity/test_data/tmp/test_json_value_from_bson_null_export.parquet' WITH (FORMAT PARQUET);
+
+statement ok
+DROP TABLE IF EXISTS test_json_value_from_bson_null_export_csv;
+
+statement ok
+CREATE TABLE test_json_value_from_bson_null_export_csv (id INT, meta JSON);
+
+statement ok
+COPY test_json_value_from_bson_null_export_csv FROM '/var/infinity/test_data/tmp/test_json_value_from_bson_null_export.csv' WITH (FORMAT CSV, DELIMITER ',');
+
+query IT rowsort
+SELECT * FROM test_json_value_from_bson_null_export_csv;
+----
+1 null
+2 {"k": 1}
+
+statement ok
+DROP TABLE IF EXISTS test_json_value_from_bson_null_export_jsonl;
+
+statement ok
+CREATE TABLE test_json_value_from_bson_null_export_jsonl (id INT, meta JSON);
+
+statement ok
+COPY test_json_value_from_bson_null_export_jsonl FROM '/var/infinity/test_data/tmp/test_json_value_from_bson_null_export.jsonl' WITH (FORMAT JSONL);
+
+query IT rowsort
+SELECT * FROM test_json_value_from_bson_null_export_jsonl;
+----
+1 null
+2 {"k": 1}
+
+statement ok
+DROP TABLE IF EXISTS test_json_value_from_bson_null_export_parquet;
+
+statement ok
+CREATE TABLE test_json_value_from_bson_null_export_parquet (id INT, meta JSON);
+
+statement ok
+COPY test_json_value_from_bson_null_export_parquet FROM '/var/infinity/test_data/tmp/test_json_value_from_bson_null_export.parquet' WITH (FORMAT PARQUET);
+
+query IT rowsort
+SELECT * FROM test_json_value_from_bson_null_export_parquet;
+----
+1 null
+2 {"k": 1}
+
+statement ok
+DROP TABLE IF EXISTS test_json_value_from_bson_null_export;
+
+statement ok
+DROP TABLE IF EXISTS test_json_value_from_bson_null_export_csv;
+
+statement ok
+DROP TABLE IF EXISTS test_json_value_from_bson_null_export_jsonl;
+
+statement ok
+DROP TABLE IF EXISTS test_json_value_from_bson_null_export_parquet;
