@@ -15,6 +15,8 @@
 module;
 
 #include <cassert>
+#include <cerrno>
+#include <cstring>
 #include <fcntl.h>
 #include <pthread.h>
 #include <sched.h>
@@ -27,6 +29,7 @@ import :file_writer;
 import :profiler;
 import :logger;
 import :blocking_queue;
+import :infinity_exception;
 
 import std.compat;
 import third_party;
@@ -408,6 +411,12 @@ void SortMerger<KeyType, LenType>::Output(FILE *f, u32 idx) {
 template <typename KeyType, typename LenType>
 void SortMerger<KeyType, LenType>::Run() {
     FILE *f = fopen(filenm_.c_str(), "r");
+    if (f == nullptr) {
+        const int open_errno = errno;
+        UnrecoverableError(fmt::format("Can't open {} for sort-merge input: {}",
+                                       filenm_,
+                                       std::strerror(open_errno)));
+    }
 
     DirectIO io_stream(f);
     FILE_LEN_ = io_stream.Length();
@@ -416,11 +425,20 @@ void SortMerger<KeyType, LenType>::Run() {
 
     Init(io_stream);
 
+    // Open and validate the output file *before* spawning worker threads. If
+    // fopen fails here, UnrecoverableError throws; if any worker threads were
+    // already running, their std::thread destructors would std::terminate.
+    FILE *out_f = fopen((filenm_ + ".out").c_str(), "w+");
+    if (out_f == nullptr) {
+        const int open_errno = errno;
+        UnrecoverableError(fmt::format("Can't open {} for sort-merge output: {}",
+                                       filenm_ + ".out",
+                                       std::strerror(open_errno)));
+    }
+    IASSERT(fwrite(&count_, sizeof(u64), 1, out_f) == 1);
+
     std::unique_ptr<std::thread> predict_thread = std::make_unique<std::thread>(std::bind(&self_t::Predict, this, io_stream));
     std::unique_ptr<std::thread> merge_thread = std::make_unique<std::thread>(std::bind(&self_t::Merge, this));
-    FILE *out_f = fopen((filenm_ + ".out").c_str(), "w+");
-    IASSERT(out_f);
-    IASSERT(fwrite(&count_, sizeof(u64), 1, out_f) == 1);
 
     std::vector<std::unique_ptr<std::thread>> threads;
     threads.push_back(std::move(predict_thread));
@@ -532,6 +550,12 @@ template <typename KeyType, typename LenType>
     requires std::same_as<KeyType, TermTuple>
 void SortMergerTermTuple<KeyType, LenType>::InitRunFile() {
     run_file_ = fopen(this->filenm_.c_str(), "r");
+    if (run_file_ == nullptr) {
+        const int open_errno = errno;
+        UnrecoverableError(fmt::format("Can't open {} for sort-merge run file: {}",
+                                       this->filenm_,
+                                       std::strerror(open_errno)));
+    }
 }
 
 template <typename KeyType, typename LenType>
