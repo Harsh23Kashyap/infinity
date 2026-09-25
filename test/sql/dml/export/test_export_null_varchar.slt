@@ -1,0 +1,65 @@
+# name: test/sql/dml/export/test_export_null_varchar.slt
+# description: Export must not segfault on NULL VARCHAR cells
+# group: [dml, export]
+
+statement ok
+DROP TABLE IF EXISTS test_export_null_varchar;
+
+statement ok
+CREATE TABLE test_export_null_varchar (id INT, s VARCHAR);
+
+statement ok
+INSERT INTO test_export_null_varchar VALUES (1, NULL), (2, 'hello');
+
+query II rowsort
+SELECT * FROM test_export_null_varchar;
+----
+1 null
+2 hello
+
+# CSV export previously crashed in Value::ToString on the typed-null VARCHAR.
+statement ok
+COPY test_export_null_varchar TO '/var/infinity/test_data/tmp/test_export_null_varchar.csv' WITH (FORMAT CSV, DELIMITER ',');
+
+# JSONL export previously crashed in Value::AppendToJson.
+statement ok
+COPY test_export_null_varchar TO '/var/infinity/test_data/tmp/test_export_null_varchar.jsonl' WITH (FORMAT JSONL);
+
+statement ok
+DROP TABLE IF EXISTS test_import_null_varchar_csv;
+
+statement ok
+CREATE TABLE test_import_null_varchar_csv (id INT, s VARCHAR);
+
+statement ok
+COPY test_import_null_varchar_csv FROM '/var/infinity/test_data/tmp/test_export_null_varchar.csv' WITH (FORMAT CSV, DELIMITER ',');
+
+query II rowsort
+SELECT * FROM test_import_null_varchar_csv;
+----
+1 null
+2 hello
+
+statement ok
+DROP TABLE IF EXISTS test_import_null_varchar_jsonl;
+
+statement ok
+CREATE TABLE test_import_null_varchar_jsonl (id INT, s VARCHAR);
+
+statement ok
+COPY test_import_null_varchar_jsonl FROM '/var/infinity/test_data/tmp/test_export_null_varchar.jsonl' WITH (FORMAT JSONL);
+
+query II rowsort
+SELECT * FROM test_import_null_varchar_jsonl;
+----
+1 null
+2 hello
+
+statement ok
+DROP TABLE IF EXISTS test_export_null_varchar;
+
+statement ok
+DROP TABLE IF EXISTS test_import_null_varchar_csv;
+
+statement ok
+DROP TABLE IF EXISTS test_import_null_varchar_jsonl;
