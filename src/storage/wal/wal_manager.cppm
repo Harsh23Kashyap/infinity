@@ -18,6 +18,8 @@ import :blocking_queue;
 import :log_file;
 import :options;
 
+import std;
+
 namespace infinity {
 // class FlushOptionType;
 
@@ -134,6 +136,10 @@ private:
     // Only Flush thread access following members
     std::ofstream ofs_{};
     FlushOptionType flush_option_{FlushOptionType::kOnlyWrite};
+    // Time of the last ofs_.flush() under FlushOptionType::kFlushPerSecond.
+    // Zero-initialised so the first batch always flushes; subsequent batches
+    // fall into the 1 Hz cadence. Flush-thread-local; no synchronization.
+    std::chrono::steady_clock::time_point last_flush_ts_{};
     std::unique_ptr<BottomExecutor> bottom_executor_{nullptr};
 
     // Flush and Checkpoint threads access following members
