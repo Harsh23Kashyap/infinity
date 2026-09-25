@@ -48,6 +48,7 @@ export std::string ToString(SegmentStatus segment_status) {
         case SegmentStatus::kDeprecated:
             return "Deprecated";
     }
+    return "Unknown";
 }
 
 export class SegmentMeta {
