@@ -69,8 +69,12 @@ void PhysicalShow::ExecuteShowSegmentDetail(QueryContext *query_context, ShowOpe
 
         ++column_id;
         {
-            //            Value value = Value::MakeVarchar(*segment_info->segment_dir_);
-            Value value = Value::MakeVarchar("TODO");
+            // The segment_dir_ field is std::shared_ptr<std::string>; per
+            // segment_meta.cppm:117 the field has a "TODO: check if it
+            // is no longer in use" comment. Until that's resolved, emit
+            // an empty string when the field is null instead of the
+            // previous "TODO" placeholder.
+            Value value = segment_info->segment_dir_ ? Value::MakeVarchar(*segment_info->segment_dir_) : Value::MakeVarchar("");
             ValueExpression value_expr(value);
             value_expr.AppendToChunk(output_block_ptr->column_vectors_[column_id]);
         }
