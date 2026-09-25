@@ -352,19 +352,42 @@ public:
     }
 
     // Value getter for each type outside union
-    const std::string &GetVarchar() const { return this->value_info_->Get<StringValueInfo>().GetString(); }
+    const std::string &GetVarchar() const {
+        if (this->value_info_ == nullptr) {
+            UnrecoverableError("Value::GetVarchar() called on a Value with null value_info_");
+        }
+        return this->value_info_->Get<StringValueInfo>().GetString();
+    }
 
-    std::span<char> GetEmbedding() const { return this->value_info_->Get<EmbeddingValueInfo>().GetData(); }
+    std::span<char> GetEmbedding() const {
+        if (this->value_info_ == nullptr) {
+            UnrecoverableError("Value::GetEmbedding() called on a Value with null value_info_");
+        }
+        return this->value_info_->Get<EmbeddingValueInfo>().GetData();
+    }
 
-    std::vector<uint8_t> GetBson() const { return this->value_info_->Get<JsonValueInfo>().bson_elements_; }
+    std::vector<uint8_t> GetBson() const {
+        if (this->value_info_ == nullptr) {
+            UnrecoverableError("Value::GetBson() called on a Value with null value_info_");
+        }
+        return this->value_info_->Get<JsonValueInfo>().bson_elements_;
+    }
 
     const std::vector<std::shared_ptr<EmbeddingValueInfo>> &GetTensorArray() const {
+        if (this->value_info_ == nullptr) {
+            UnrecoverableError("Value::GetTensorArray() called on a Value with null value_info_");
+        }
         return this->value_info_->Get<TensorArrayValueInfo>().member_tensor_data_;
     }
 
     const std::vector<Value> &GetArray() const;
 
-    std::tuple<size_t, std::span<char>, std::span<char>> GetSparse() const { return this->value_info_->Get<SparseValueInfo>().GetData(); }
+    std::tuple<size_t, std::span<char>, std::span<char>> GetSparse() const {
+        if (this->value_info_ == nullptr) {
+            UnrecoverableError("Value::GetSparse() called on a Value with null value_info_");
+        }
+        return this->value_info_->Get<SparseValueInfo>().GetData();
+    }
 
     [[nodiscard]] const DataType &type() const { return type_; }
 
