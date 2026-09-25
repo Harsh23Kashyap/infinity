@@ -1,0 +1,47 @@
+# json_extract_* null guard: must not crash on SQL NULL JSON rows
+
+statement ok
+DROP TABLE IF EXISTS test_json_extract_null;
+
+statement ok
+CREATE TABLE test_json_extract_null (id INT, meta JSON);
+
+statement ok
+INSERT INTO test_json_extract_null VALUES (1, NULL), (2, '{"val": 42, "flag": true, "name": "ok"}');
+
+# NULL JSON row: typed extractors return SQL NULL, no crash
+query I
+SELECT json_extract_int(meta, '$.val') FROM test_json_extract_null WHERE id = 1;
+----
+null
+
+query T
+SELECT json_extract_string(meta, '$.name') FROM test_json_extract_null WHERE id = 1;
+----
+null
+
+query B
+SELECT json_extract_bool(meta, '$.flag') FROM test_json_extract_null WHERE id = 1;
+----
+null
+
+query F
+SELECT json_extract_double(meta, '$.val') FROM test_json_extract_null WHERE id = 1;
+----
+null
+
+# Valid JSON row still works
+query I
+SELECT json_extract_int(meta, '$.val') FROM test_json_extract_null WHERE id = 2;
+----
+42
+
+query T
+SELECT json_extract_string(meta, '$.name') FROM test_json_extract_null WHERE id = 2;
+----
+ok
+
+query B
+SELECT json_extract_bool(meta, '$.flag') FROM test_json_extract_null WHERE id = 2;
+----
+true
