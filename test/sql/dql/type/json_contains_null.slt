@@ -1,0 +1,33 @@
+# json_contains null guard: 2-arg form must not crash on SQL NULL JSON rows
+
+statement ok
+DROP TABLE IF EXISTS test_json_contains_null;
+
+statement ok
+CREATE TABLE test_json_contains_null (id INT, meta JSON);
+
+statement ok
+INSERT INTO test_json_contains_null VALUES (1, NULL), (2, '["电商", "美妆", "母婴"]');
+
+# NULL JSON row: match 3-arg behavior (false, no crash)
+query B
+SELECT json_contains(meta, '"美妆"') FROM test_json_contains_null WHERE id = 1;
+----
+false
+
+# Valid JSON row still works
+query B
+SELECT json_contains(meta, '"美妆"') FROM test_json_contains_null WHERE id = 2;
+----
+true
+
+query B
+SELECT json_contains(meta, '"missing"') FROM test_json_contains_null WHERE id = 2;
+----
+false
+
+# 3-arg path on NULL JSON for parity
+query B
+SELECT json_contains(meta, '$.0', '"美妆"') FROM test_json_contains_null WHERE id = 1;
+----
+false
