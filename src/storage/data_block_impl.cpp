@@ -142,8 +142,9 @@ void DataBlock::Reset() {
     finalized = false;
 }
 
-// TODO: May cause error when capacity is larger than the originally allocated size
-// TODO: Initialize() parameter may not be ColumnVectorType::kFlat ?
+// Reset each column into just initialized status with the given capacity.
+// ColumnVector::Initialize handles the case where the new capacity exceeds the
+// previously-allocated buffer (re-allocates the buffer in that case).
 void DataBlock::Reset(size_t capacity) {
     if (!initialized) {
         UnrecoverableError("Should not reset an uninitialized block.");
