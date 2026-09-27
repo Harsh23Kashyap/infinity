@@ -234,8 +234,17 @@ void ColumnVector::Initialize(ColumnVectorType vector_type, size_t capacity) {
         }
         data_ptr_ = buffer_->GetDataMut();
     } else {
-        // Initialize after reset will come to this branch
-        buffer_->ResetToInit(vector_buffer_type);
+        // Initialize after reset will come to this branch.
+        // If the new capacity exceeds the existing buffer's capacity, the
+        // buffer is too small to hold `capacity` rows. Re-allocate it.
+        // Otherwise, reuse the buffer via ResetToInit.
+        if (capacity > buffer_->capacity()) {
+            buffer_ = VectorBuffer::Make(data_type_size_, capacity, vector_buffer_type);
+            nulls_ptr_ = Bitmask::MakeSharedAllTrue(capacity);
+        } else {
+            buffer_->ResetToInit(vector_buffer_type);
+        }
+        data_ptr_ = buffer_->GetDataMut();
     }
 }
 

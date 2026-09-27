@@ -302,3 +302,61 @@ TEST_P(DataBlockTest, ReadWrite) {
     EXPECT_NE(data_block2, nullptr);
     EXPECT_EQ(data_block == *data_block2, true);
 }
+
+TEST_P(DataBlockTest, test_reset_resize_buffer) {
+    using namespace infinity;
+
+    // Regression test for issue #78: DataBlock::Reset(capacity) where the new
+    // capacity exceeds the original allocation used to silently corrupt memory
+    // (the column's capacity_ was updated but the underlying buffer was not
+    // re-allocated, so writes past the original size scribbled on whatever
+    // followed the buffer in memory).
+
+    DataBlock data_block;
+    std::vector<std::shared_ptr<DataType>> column_types;
+    column_types.emplace_back(std::make_shared<DataType>(LogicalType::kTinyInt));
+
+    // Initial allocation: DEFAULT_VECTOR_SIZE rows.
+    constexpr size_t kOriginalRowCount = DEFAULT_VECTOR_SIZE;
+    data_block.Init(column_types);
+    for (size_t i = 0; i < kOriginalRowCount; ++i) {
+        data_block.AppendValue(0, Value::MakeTinyInt(static_cast<i8>(i)));
+    }
+    data_block.Finalize();
+
+    // Resize to a larger capacity and append the same number of rows. Before
+    // the fix, the second AppendValue loop would write past the end of the
+    // original buffer.
+    constexpr size_t kNewRowCount = DEFAULT_VECTOR_SIZE * 2;
+    EXPECT_NO_THROW(data_block.Reset(kNewRowCount));
+    EXPECT_EQ(data_block.capacity(), kNewRowCount);
+
+    for (size_t i = 0; i < kNewRowCount; ++i) {
+        EXPECT_NO_THROW(data_block.AppendValue(0, Value::MakeTinyInt(static_cast<i8>(i))));
+    }
+    data_block.Finalize();
+    EXPECT_EQ(data_block.row_count(), kNewRowCount);
+
+    // Verify every value can be read back correctly (would fail before the fix
+    // because of buffer overrun).
+    for (size_t i = 0; i < kNewRowCount; ++i) {
+        Value value = data_block.GetValue(0, i);
+        EXPECT_EQ(value.type().type(), LogicalType::kTinyInt);
+        EXPECT_EQ(value.value_.tiny_int, static_cast<i8>(i));
+    }
+
+    // Resize down to a smaller capacity and verify the existing buffer is
+    // reused via ResetToInit (no re-allocation).
+    constexpr size_t kSmallerRowCount = DEFAULT_VECTOR_SIZE / 2;
+    EXPECT_NO_THROW(data_block.Reset(kSmallerRowCount));
+    EXPECT_EQ(data_block.capacity(), kSmallerRowCount);
+    for (size_t i = 0; i < kSmallerRowCount; ++i) {
+        EXPECT_NO_THROW(data_block.AppendValue(0, Value::MakeTinyInt(static_cast<i8>(-i))));
+    }
+    data_block.Finalize();
+    EXPECT_EQ(data_block.row_count(), kSmallerRowCount);
+    for (size_t i = 0; i < kSmallerRowCount; ++i) {
+        Value value = data_block.GetValue(0, i);
+        EXPECT_EQ(value.value_.tiny_int, static_cast<i8>(-i));
+    }
+}
