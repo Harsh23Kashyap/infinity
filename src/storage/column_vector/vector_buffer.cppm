@@ -86,6 +86,10 @@ public:
         }
     }
 
+    [[nodiscard]] size_t data_size() const { return data_size_; }
+
+    [[nodiscard]] size_t capacity() const { return capacity_; }
+
     [[nodiscard]] bool GetCompactBit(size_t idx) const;
 
     void SetCompactBit(size_t idx, bool val);
