@@ -300,7 +300,7 @@ std::unique_ptr<QueryNode> SearchDriver::AnalyzeAndBuildQueryNode(const std::str
 
 // Unescape reserved characters per https://www.elastic.co/guide/en/elasticsearch/reference/current/query-dsl-query-string-query.html
 // Shall keep sync with ESCAPEABLE in search_lexer.l
-// [\x20()^"'~*?:\\]
+// [\x20()^"'~*?:\\-]
 std::string SearchDriver::Unescape(const std::string &text) {
     std::string result;
     result.reserve(text.size());
@@ -318,6 +318,7 @@ std::string SearchDriver::Unescape(const std::string &text) {
                 case '?':
                 case ':':
                 case '\\':
+                case '-':
                     result.push_back(text[i + 1]);
                     ++i;
                     break;
