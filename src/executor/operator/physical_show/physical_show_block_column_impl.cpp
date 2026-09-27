@@ -69,8 +69,12 @@ void PhysicalShow::ExecuteShowBlockColumn(QueryContext *query_context, ShowOpera
 
         ++column_id;
         {
-            Value value = Value::MakeVarchar("TODO");
-            //            Value value = Value::MakeVarchar(*block_column_info->filename_);
+            // filename_ may be nullptr (the population site at
+            // block_meta_impl.cpp:349 still has a TODO; see issue #108).
+            // Emit an empty string in that case rather than dereferencing
+            // the null shared_ptr (UB) or returning the literal "TODO".
+            Value value = block_column_info->filename_ ? Value::MakeVarchar(*block_column_info->filename_)
+                                                      : Value::MakeVarchar("");
             ValueExpression value_expr(value);
             value_expr.AppendToChunk(output_block_ptr->column_vectors_[column_id]);
         }
