@@ -114,7 +114,6 @@ private:
     KVInstance &kv_instance_;
     TableMeta &table_meta_;
     SegmentID segment_id_;
-    std::optional<std::string> segment_dir_; // TODO: check if it is no longer in use
 
     std::optional<std::vector<BlockID>> block_ids1_;
     std::optional<size_t> row_cnt_;
