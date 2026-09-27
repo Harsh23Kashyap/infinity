@@ -69,8 +69,12 @@ void PhysicalShow::ExecuteShowSegmentDetail(QueryContext *query_context, ShowOpe
 
         ++column_id;
         {
-            //            Value value = Value::MakeVarchar(*segment_info->segment_dir_);
-            Value value = Value::MakeVarchar("TODO");
+            // segment_dir_ may be std::nullopt (the population site at
+            // segment_meta.cppm:117 still has a TODO; see issue #108).
+            // Emit an empty string in that case rather than dereferencing
+            // the empty optional (UB) or returning the literal "TODO".
+            Value value = segment_info->segment_dir_.has_value() ? Value::MakeVarchar(*segment_info->segment_dir_)
+                                                                  : Value::MakeVarchar("");
             ValueExpression value_expr(value);
             value_expr.AppendToChunk(output_block_ptr->column_vectors_[column_id]);
         }
