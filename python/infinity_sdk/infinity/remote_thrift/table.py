@@ -252,6 +252,9 @@ class RemoteTable():
                         raise InfinityException(ErrorCode.IMPORT_FILE_FORMAT_ERROR,
                                                 f"Unrecognized import file type: {file_type}")
                 elif key == 'delimiter':
+                    if not isinstance(v, str):
+                        raise InfinityException(ErrorCode.IMPORT_FILE_FORMAT_ERROR,
+                                                f"Unrecognized import file delimiter: {v!r}")
                     delimiter = v.lower()
                     if len(delimiter) != 1:
                         raise InfinityException(ErrorCode.IMPORT_FILE_FORMAT_ERROR,
@@ -299,6 +302,9 @@ class RemoteTable():
                         raise InfinityException(ErrorCode.IMPORT_FILE_FORMAT_ERROR,
                                                 f"Unrecognized export file type: {file_type}")
                 elif key == 'delimiter':
+                    if not isinstance(v, str):
+                        raise InfinityException(ErrorCode.IMPORT_FILE_FORMAT_ERROR,
+                                                f"Unrecognized export file delimiter: {v!r}")
                     delimiter = v.lower()
                     if len(delimiter) != 1:
                         raise InfinityException(ErrorCode.IMPORT_FILE_FORMAT_ERROR,
