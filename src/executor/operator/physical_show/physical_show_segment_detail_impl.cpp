@@ -69,8 +69,7 @@ void PhysicalShow::ExecuteShowSegmentDetail(QueryContext *query_context, ShowOpe
 
         ++column_id;
         {
-            //            Value value = Value::MakeVarchar(*segment_info->segment_dir_);
-            Value value = Value::MakeVarchar("TODO");
+            Value value = Value::MakeVarchar("");
             ValueExpression value_expr(value);
             value_expr.AppendToChunk(output_block_ptr->column_vectors_[column_id]);
         }
