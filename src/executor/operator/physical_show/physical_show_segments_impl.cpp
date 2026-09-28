@@ -53,7 +53,7 @@ void PhysicalShow::ExecuteShowSegments(QueryContext *query_context, ShowOperator
             std::string segment_size_str = "TODO";
             //            std::string full_segment_dir = fmt::format("{}/seg_{}")
             //            std::string full_segment_dir = std::filesystem::path(InfinityContext::instance().config()->DataDir()) /
-            //            *segment_info->segment_dir_; if (query_context->persistence_manager() == nullptr) {
+            //            if (query_context->persistence_manager() == nullptr) {
             //                segment_size_str = Utility::FormatByteSize(VirtualStore::GetDirectorySize(full_segment_dir));
             //            } else {
             //                const std::vector<std::string> &paths = segment_info->files_;

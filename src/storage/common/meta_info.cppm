@@ -73,7 +73,6 @@ export struct TableIndexInfo {
 export struct SegmentInfo {
     SegmentID segment_id_{};
     SegmentStatus status_{};
-    std::shared_ptr<std::string> segment_dir_{};
     i64 block_count_{};
     i64 row_count_{};
     i64 actual_row_count_{};
