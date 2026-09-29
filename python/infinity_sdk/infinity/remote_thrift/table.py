@@ -246,6 +246,9 @@ class RemoteTable:
             for k, v in import_options.items():
                 key = k.lower()
                 if key == 'file_type':
+                    if not isinstance(v, str):
+                        raise InfinityException(ErrorCode.IMPORT_FILE_FORMAT_ERROR,
+                                                f"Unrecognized import file type: {v!r}")
                     file_type = v.lower()
                     if file_type == 'csv':
                         options.copy_file_type = ttypes.CopyFileType.CSV
@@ -302,6 +305,9 @@ class RemoteTable:
             for k, v in export_options.items():
                 key = k.lower()
                 if key == 'file_type':
+                    if not isinstance(v, str):
+                        raise InfinityException(ErrorCode.IMPORT_FILE_FORMAT_ERROR,
+                                                f"Unrecognized export file type: {v!r}")
                     file_type = v.lower()
                     if file_type == 'csv':
                         options.copy_file_type = ttypes.CopyFileType.CSV
