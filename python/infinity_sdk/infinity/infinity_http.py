@@ -1213,6 +1213,9 @@ class table_http_result:
                     sparse_vec = str2sparse(v)
                     new_tup = tup + (sparse_vec,)
                 else:
+                    if not isinstance(v, str):
+                        raise InfinityException(ErrorCode.INVALID_DATA_TYPE,
+                                                f"Invalid column value: {v!r} (expected str-like or one of None/int/float/list/sparse/datetime, got {type(v).__name__})")
                     if v.lower() == 'true':
                         v = True
                     elif v.lower() == 'false':
