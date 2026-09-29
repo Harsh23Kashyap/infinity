@@ -244,6 +244,9 @@ class InfinityThriftQueryBuilder(ABC):
             optional_filter = get_search_optional_filter_from_opt_params(knn_params)
             for k, v in knn_params.items():
                 key = k.lower()
+                if not isinstance(v, str):
+                    raise InfinityException(ErrorCode.INVALID_PARAMETER_VALUE,
+                                            f"Invalid knn opt param value: {v!r} (expected str, got {type(v).__name__})")
                 value = v.lower()
                 knn_opt_params.append(InitParameter(key, value))
 
@@ -686,6 +689,9 @@ class InfinityThriftQueryBuilder(ABC):
             optional_filter = get_search_optional_filter_from_opt_params(knn_params)
             for k, v in knn_params.items():
                 key = k.lower()
+                if not isinstance(v, str):
+                    raise InfinityException(ErrorCode.INVALID_PARAMETER_VALUE,
+                                            f"Invalid knn opt param value: {v!r} (expected str, got {type(v).__name__})")
                 value = v.lower()
                 knn_opt_params.append(InitParameter(key, value))
 
