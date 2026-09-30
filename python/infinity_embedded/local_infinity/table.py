@@ -238,7 +238,7 @@ class LocalTable:
                         options.copy_file_type = CopyFileType.kBVECS
                     else:
                         raise InfinityException(ErrorCode.IMPORT_FILE_FORMAT_ERROR,
-                                                f"Unrecognized export file type: {file_type}")
+                                                f"Unrecognized import file type: {file_type}")
                 elif key == 'delimiter':
                     if not isinstance(v, str):
                         raise InfinityException(ErrorCode.IMPORT_FILE_FORMAT_ERROR,
@@ -246,7 +246,7 @@ class LocalTable:
                     delimiter = v.lower()
                     if len(delimiter) != 1:
                         raise InfinityException(ErrorCode.IMPORT_FILE_FORMAT_ERROR,
-                                                f"Unrecognized export file delimiter: {delimiter}")
+                                                f"Unrecognized import file delimiter: {delimiter}")
                     options.delimiter = delimiter[0]
                 elif key == 'header':
                     if isinstance(v, bool):
