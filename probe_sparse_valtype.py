@@ -1,7 +1,12 @@
-import sys, time
+import sys, time, traceback
 sys.path.insert(0, "python/infinity_sdk")
-import infinity
-from infinity.common import ConflictType, NetworkAddress
+try:
+    import infinity
+    from infinity.common import ConflictType, NetworkAddress
+except Exception:
+    for line in traceback.format_exc().splitlines()[-6:]:
+        print(f"::error title=IMPORT::{line[:280]}", flush=True)
+    sys.exit(1)
 
 def note(m): print(f"::notice title=PROBE::{m}", flush=True)
 def err(m): print(f"::error title=PROBE::{m}", flush=True)

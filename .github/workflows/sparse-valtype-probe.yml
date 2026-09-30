@@ -13,7 +13,7 @@ jobs:
           sleep 15
           docker ps -a
       - name: deps
-        run: pip install --quiet thrift numpy pandas polars
+        run: pip install --quiet thrift numpy pandas polars pyarrow requests sqlglot python-datrie hanziconv nltk readerwriterlock
       - name: create and insert
         run: python3 probe_sparse_valtype.py define
         env:
