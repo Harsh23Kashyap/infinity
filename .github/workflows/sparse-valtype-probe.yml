@@ -1,0 +1,39 @@
+name: sparse-valtype-probe
+on:
+  push:
+    branches: [ci-probe-sparse-valtype]
+jobs:
+  probe:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: start server
+        run: |
+          docker run -d --name infinity -p 23817:23817 infiniflow/infinity:nightly-x64-v2
+          sleep 15
+          docker ps -a
+      - name: deps
+        run: pip install --quiet thrift numpy pandas polars
+      - name: create and insert
+        run: python3 probe_sparse_valtype.py define
+        env:
+          PYTHONPATH: python/infinity_sdk
+      - name: control match on f32
+        run: python3 probe_sparse_valtype.py match t_f32
+        env:
+          PYTHONPATH: python/infinity_sdk
+      - name: match on f16
+        run: python3 probe_sparse_valtype.py match t_f16
+        env:
+          PYTHONPATH: python/infinity_sdk
+        if: always()
+      - name: match on bf16
+        run: python3 probe_sparse_valtype.py match t_bf16
+        env:
+          PYTHONPATH: python/infinity_sdk
+        if: always()
+      - name: server state and logs
+        if: always()
+        run: |
+          docker inspect --format 'container={{.State.Status}} exit={{.State.ExitCode}} oom={{.State.OOMKilled}}' infinity | sed 's/^/::notice title=SERVER::/'
+          docker logs infinity 2>&1 | grep -iE "not implemented|critical|unrecoverable|sigusr|signal" | tail -5 | cut -c1-280 | while IFS= read -r l; do echo "::notice title=SERVERLOG::$l"; done
