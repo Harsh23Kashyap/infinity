@@ -92,3 +92,26 @@ class TestInfinity:
 
         res = db_obj.drop_table("test_query_builder", ConflictType.Error)
         assert res.error_code == ErrorCode.OK
+
+
+# Optional query-builder clauses should clear their backing field when the caller
+## passes None (consistent with limit(None) / offset(None) after #3499). These tests
+# do not need a running server; they exercise the query-builder class directly.
+@pytest.mark.parametrize("builder_type", ["thrift", "local"])
+@pytest.mark.parametrize("clause,attr", [
+    ("filter", "_filter"),
+    ("group_by", "_group_by"),
+    ("having", "_having"),
+    ("output", "_columns"),
+    ("highlight", "_highlight"),
+    ("sort", "_sort"),
+])
+def test_query_builder_optional_clause_none_clear_clause(builder_type, clause, attr):
+    if builder_type == "local":
+        local_query_builder = pytest.importorskip("infinity_embedded.local_infinity.query_builder")
+        query_builder = local_query_builder.InfinityLocalQueryBuilder(None)
+    else:
+        query_builder = InfinityThriftQueryBuilder(None)
+
+    builder = getattr(query_builder, clause)
+    assert getattr(builder(None), attr) is None
