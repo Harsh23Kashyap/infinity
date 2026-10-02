@@ -145,8 +145,11 @@ def parse_single_array_bytes(column_data_type: WrapDataType, bytes_data, offset)
     offset += 4
     single_pod_element_size = 0
     parse_single_element_func = None
-    # TODO: RowID is always converted to BigInt, check src/function/builtin_functions.cpp
+    # RowID is stored as kBigInt per src/function/builtin_functions_impl.cpp:208
+    # ("ROW_ID" special function registers with DataType(LogicalType::kBigInt)).
     match element_data_type.logical_type:
+        case LogicalType.kRowID:
+            single_pod_element_size = 8
         case LogicalType.kBoolean:
             single_pod_element_size = 1
         case LogicalType.kTinyInt:
