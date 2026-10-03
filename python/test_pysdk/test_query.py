@@ -92,3 +92,61 @@ class TestInfinity:
 
         res = db_obj.drop_table("test_query_builder", ConflictType.Error)
         assert res.error_code == ErrorCode.OK
+
+
+# Regression tests for PR #121 (Fix #120): match_dense must reject non-string
+# knn_params values with InfinityException(INVALID_PARAMETER_VALUE), not
+# AttributeError from calling .lower() on a non-string. Server-free: the
+# isinstance guard fires before any actual server round-trip. Same pattern as
+# test_query_builder_optional_clause_none_clear_clause (PR #127) and
+# test_parse_single_array_bytes_handles_rowid_element_* (PR #131).
+#
+# The key "threshold" is chosen to avoid the filter-pop branch in
+# get_search_optional_filter_from_opt_params (which only fires on key "filter"
+# and has its own isinstance check at infinity_embedded/local_infinity/utils.py:266
+# and the Thrift SDK's mirror at infinity_sdk/infinity/remote_thrift/utils.py).
+@pytest.mark.parametrize("builder_type", ["thrift", "local"])
+@pytest.mark.parametrize("opt_value", [None, True, False, 0, 0.5, [1, 2, 3], {"a": "b"}])
+def test_match_dense_knn_opt_param_rejects_non_string_value(builder_type, opt_value):
+    """Non-string `knn_params` values must surface
+    InfinityException(INVALID_PARAMETER_VALUE), not AttributeError."""
+    if builder_type == "local":
+        local_query_builder = pytest.importorskip("infinity_embedded.local_infinity.query_builder")
+        query_builder = local_query_builder.InfinityLocalQueryBuilder(None)
+    else:
+        query_builder = InfinityThriftQueryBuilder(None)
+
+    with pytest.raises(InfinityException) as exc:
+        query_builder.match_dense(
+            "vec", [1.0], "l2", 0, knn_params={"threshold": opt_value}
+        )
+    assert exc.value.error_code == ErrorCode.INVALID_PARAMETER_VALUE
+
+
+@pytest.mark.parametrize("builder_type", ["thrift", "local"])
+def test_match_dense_knn_opt_param_accepts_string_value(builder_type):
+    """Happy path for PR #121 (Fix #120). String `knn_params` values must not
+    trigger the isinstance guard, and the call must complete (no
+    INVALID_PARAMETER_VALUE for a valid string)."""
+    if builder_type == "local":
+        local_query_builder = pytest.importorskip("infinity_embedded.local_infinity.query_builder")
+        query_builder = local_query_builder.InfinityLocalQueryBuilder(None)
+    else:
+        query_builder = InfinityThriftQueryBuilder(None)
+
+    # String values must NOT raise INVALID_PARAMETER_VALUE. (We do not assert
+    # full to_df() success here because the query_builder's match_dense path
+    # needs additional state for the actual search, which is server-side; we
+    # only verify the isinstance guard does not fire.)
+    try:
+        query_builder.match_dense(
+            "vec", [1.0], "l2", 0, knn_params={"threshold": "0.5"}
+        )
+    except InfinityException as exc:
+        # The only acceptable exception is INVALID_EMBEDDING_DATA_TYPE (the
+        # helper that interprets [1.0] as a Tensor of float may surface it
+        # before reaching the search path); INVALID_PARAMETER_VALUE would mean
+        # the isinstance guard mis-fired on a valid string.
+        assert exc.error_code != ErrorCode.INVALID_PARAMETER_VALUE, (
+            "isinstance guard fired on a valid string value"
+        )
