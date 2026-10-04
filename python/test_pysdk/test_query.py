@@ -104,10 +104,20 @@ class TestInfinity:
 # The dispatch chain in to_result() checks isinstance(v, (int, float)),
 # is_list(v), is_date(v)/is_time(v)/is_datetime(v), is_sparse(v), and only
 # falls into the `else` (where the PR #123 isinstance guard fires) when
-# none of those match. None/int/float are caught by the first branch. So
-# the parametrized set is restricted to types that bypass the existing
-# branches and hit the isinstance guard: bool (True/False) and dict.
-@pytest.mark.parametrize("col_value", [True, False, {"a": "b"}])
+# none of those match. The parametrized set must be restricted to types that
+# bypass ALL existing branches and only hit the new isinstance guard.
+#
+# IMPORTANT: in Python 3, `bool` is a subclass of `int`, so
+# `isinstance(True, (int, float)) == True`. That means True/False are caught
+# by the FIRST branch `if v is None or isinstance(v, (int, float)):` and
+# NEVER reach the new isinstance guard. The minimum parametrized set that
+# actually exercises the new guard is: `dict`, `tuple`, `set`.
+#
+# (Cycle-69 first version used `[True, False, {"a": "b"}]`, but only the
+# `{"a": "b"}` case actually exercised the new guard — the True/False cases
+# passed on pre-fix `main` because the first branch handled them correctly.
+# Fix-up in cycle 70.)
+@pytest.mark.parametrize("col_value", [{"a": "b"}, (1, 2), {1, 2}])
 def test_to_result_row_value_rejects_non_string_non_primitive_value(col_value):
     """Non-string, non-primitive values in `output_res` must surface
     InfinityException(INVALID_DATA_TYPE), not AttributeError."""
