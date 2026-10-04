@@ -92,3 +92,73 @@ class TestInfinity:
 
         res = db_obj.drop_table("test_query_builder", ConflictType.Error)
         assert res.error_code == ErrorCode.OK
+
+
+# Regression tests for PR #123 (Fix #122): table_http_result.to_result() must
+# reject non-string, non-primitive row values with InfinityException
+# (INVALID_DATA_TYPE), not AttributeError from calling .lower() on a
+# non-string. Server-free: the test mocks table_http.show_columns_type() and
+# pre-populates output_res so to_result() skips its select() round-trip. Same
+# pytest-importorskip pattern as PR #127 / PR #131 / PR #133.
+#
+# The dispatch chain in to_result() checks isinstance(v, (int, float)),
+# is_list(v), is_date(v)/is_time(v)/is_datetime(v), is_sparse(v), and only
+# falls into the `else` (where the PR #123 isinstance guard fires) when
+# none of those match. The parametrized set must be restricted to types that
+# bypass ALL existing branches and only hit the new isinstance guard.
+#
+# IMPORTANT: in Python 3, `bool` is a subclass of `int`, so
+# `isinstance(True, (int, float)) == True`. That means True/False are caught
+# by the FIRST branch `if v is None or isinstance(v, (int, float)):` and
+# NEVER reach the new isinstance guard. The minimum parametrized set that
+# actually exercises the new guard is: `dict`, `tuple`, `set`.
+#
+# (Cycle-69 first version used `[True, False, {"a": "b"}]`, but only the
+# `{"a": "b"}` case actually exercised the new guard — the True/False cases
+# passed on pre-fix `main` because the first branch handled them correctly.
+# Fix-up in cycle 70.)
+@pytest.mark.parametrize("col_value", [{"a": "b"}, (1, 2), {1, 2}])
+def test_to_result_row_value_rejects_non_string_non_primitive_value(col_value):
+    """Non-string, non-primitive values in `output_res` must surface
+    InfinityException(INVALID_DATA_TYPE), not AttributeError."""
+    try:
+        from infinity_sdk.infinity.infinity_http import table_http_result as table_http_result_cls
+    except ImportError:
+        # The HTTP SDK is exposed at two import paths depending on whether the
+        # test environment has `infinity_sdk` installed as a package or via
+        # the legacy `infinity` import path. Fall back to the legacy path.
+        from infinity.infinity_http import table_http_result as table_http_result_cls
+
+    class _MockTableHttp:
+        def show_columns_type(self):
+            return {"col": "varchar"}
+
+    result = table_http_result_cls(output=["col"], table_http=_MockTableHttp())
+    # Pre-populate output_res so to_result() skips its select() round-trip.
+    result.output_res = [{"col": col_value}]
+
+    with pytest.raises(InfinityException) as exc:
+        result.to_result()
+    assert exc.value.error_code == ErrorCode.INVALID_DATA_TYPE
+
+
+def test_to_result_row_value_accepts_string_value():
+    """Happy path for PR #123 (Fix #122). String values that hit the `else`
+    branch must NOT raise INVALID_DATA_TYPE — they go through the v.lower()
+    'true' / 'false' / 'none' dispatch correctly."""
+    try:
+        from infinity_sdk.infinity.infinity_http import table_http_result as table_http_result_cls
+    except ImportError:
+        from infinity.infinity_http import table_http_result as table_http_result_cls
+
+    class _MockTableHttp:
+        def show_columns_type(self):
+            return {"col": "varchar"}
+
+    result = table_http_result_cls(output=["col"], table_http=_MockTableHttp())
+    result.output_res = [{"col": "true"}]
+
+    # String "true" must route through the lower() path and NOT raise
+    # INVALID_DATA_TYPE. (We don't assert the full to_df() output because
+    # the test focuses on the isinstance guard's behavior.)
+    result.to_result()
