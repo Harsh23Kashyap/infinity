@@ -37,7 +37,12 @@ from infinity_embedded.local_infinity.table import LocalTable  # noqa: E402
 
 # Thrift SDK — exposed at two import paths depending on whether the test
 # environment has ``infinity_sdk`` installed as a package or via the legacy
-# ``infinity`` import path. Fall back to the legacy path.
+# ``infinity`` import path. Try the modern path first; fall back to the
+# legacy path. The legacy path is the canonical one used in
+# python/test_pysdk/test_query.py (which the rest of this test suite relies
+# on). Both paths are tried at module load time; if neither is available,
+# ``pytest.importorskip`` skips the Thrift test class (see fixture in the
+# Thrift class below).
 try:
     from infinity_sdk.infinity.remote_thrift.table import RemoteTable  # noqa: E402
 except ImportError:
