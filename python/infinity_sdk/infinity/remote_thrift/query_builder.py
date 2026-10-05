@@ -375,9 +375,15 @@ class InfinityThriftQueryBuilder(ABC):
         group_by_list: list[ParsedExpr] = []
         if isinstance(columns, list):
             for column in columns:
+                if not isinstance(column, str):
+                    raise InfinityException(ErrorCode.INVALID_DATA_TYPE,
+                                            f"group_by column must be a string, got {type(column).__name__}: {column!r}")
                 column = column.lower()
                 group_by_list.append(parse_expr(maybe_parse(column)))
         else:
+            if not isinstance(columns, str):
+                raise InfinityException(ErrorCode.INVALID_DATA_TYPE,
+                                        f"group_by column must be a string, got {type(columns).__name__}: {columns!r}")
             group_by_list.append(parse_expr(maybe_parse(columns)))
         self._groupby = group_by_list
         return self

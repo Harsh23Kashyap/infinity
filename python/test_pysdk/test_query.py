@@ -1,7 +1,7 @@
 import infinity
 import pytest
 from infinity import index
-from infinity.common import ConflictType
+from infinity.common import ConflictType, InfinityException
 from infinity.errors import ErrorCode
 from infinity.infinity_http import infinity_http
 from infinity.remote_thrift.client import ThriftInfinityClient
@@ -92,3 +92,55 @@ class TestInfinity:
 
         res = db_obj.drop_table("test_query_builder", ConflictType.Error)
         assert res.error_code == ErrorCode.OK
+
+
+# Regression tests for PR #139 (Fix #139): InfinityThriftQueryBuilder.group_by
+# must reject non-string column values with InfinityException(INVALID_DATA_TYPE),
+# not AttributeError from calling .lower() on a non-string. Server-free: the
+# validation runs at the top of group_by() before any other call, so a Mock
+# table passed to the builder is sufficient.
+#
+# Cycle 72 lesson: the same family of v.lower()-without-isinstance guards
+# already shipped for delimiter (PR #113), file_type (PR #119), KNN opt-param
+# (PR #121), and parse_df (PR #123). PR #139 closes the gap at InfinityThriftQueryBuilder.group_by.
+#
+# IMPORTANT: in Python 3, `bool` is a subclass of `int`, so
+# `isinstance(True, str) == False`. That means True/False are correctly
+# rejected by the new guard. The minimum parametrized set that actually
+# exercises the new guard is: `int`, `None`, `dict`, `list`, `bool`.
+@pytest.mark.parametrize("bad_value", [1, None, True, False, {"a": "b"}, [1, 2]])
+def test_thrift_group_by_rejects_non_string_list_element(bad_value):
+    """Non-string elements in a group_by list must surface
+    InfinityException(INVALID_DATA_TYPE), not AttributeError."""
+    builder = InfinityThriftQueryBuilder(table=None)
+    with pytest.raises(InfinityException) as exc:
+        builder.group_by(["id", bad_value])
+    assert exc.value.error_code == ErrorCode.INVALID_DATA_TYPE
+
+
+@pytest.mark.parametrize("bad_value", [1, None, True, False, {"a": "b"}, [1, 2]])
+def test_thrift_group_by_rejects_non_string_scalar(bad_value):
+    """A non-string scalar passed to group_by must surface
+    InfinityException(INVALID_DATA_TYPE), not AttributeError."""
+    builder = InfinityThriftQueryBuilder(table=None)
+    with pytest.raises(InfinityException) as exc:
+        builder.group_by(bad_value)
+    assert exc.value.error_code == ErrorCode.INVALID_DATA_TYPE
+
+
+def test_thrift_group_by_accepts_string_list():
+    """Happy path for PR #139. A list of strings must NOT raise
+    INVALID_DATA_TYPE — case normalization proceeds correctly."""
+    builder = InfinityThriftQueryBuilder(table=None)
+    # Should not raise; just verify the builder state was updated.
+    builder.group_by(["ID", "name"])
+    assert builder._groupby is not None
+    assert len(builder._groupby) == 2
+
+
+def test_thrift_group_by_accepts_string_scalar():
+    """Happy path for PR #139, scalar form."""
+    builder = InfinityThriftQueryBuilder(table=None)
+    builder.group_by("id")
+    assert builder._groupby is not None
+    assert len(builder._groupby) == 1
