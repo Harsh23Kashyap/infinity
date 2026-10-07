@@ -242,7 +242,7 @@ class LocalTable:
                 elif key == 'delimiter':
                     if not isinstance(v, str):
                         raise InfinityException(ErrorCode.IMPORT_FILE_FORMAT_ERROR,
-                                                f"Unrecognized export file delimiter: {v!r}")
+                                                f"Unrecognized import file delimiter: {v!r}")
                     delimiter = v.lower()
                     if len(delimiter) != 1:
                         raise InfinityException(ErrorCode.IMPORT_FILE_FORMAT_ERROR,
@@ -255,7 +255,7 @@ class LocalTable:
                         raise InfinityException(ErrorCode.IMPORT_FILE_FORMAT_ERROR,
                                                 "Boolean value is expected in header field")
                 else:
-                    raise InfinityException(ErrorCode.IMPORT_FILE_FORMAT_ERROR, f"Unknown export parameter: {k}")
+                    raise InfinityException(ErrorCode.IMPORT_FILE_FORMAT_ERROR, f"Unknown import parameter: {k}")
 
         res = self._conn.import_data(db_name=self._db_name,
                                      table_name=self._table_name,
