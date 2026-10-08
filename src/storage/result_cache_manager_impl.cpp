@@ -67,8 +67,8 @@ bool CacheResultMap::AddCache(
         return false;
     }
     if (lru_list_.size() >= cache_num_capacity_) {
-        LRUEntry &envict_entry = lru_list_.back();
-        size_t remove_n = lru_map_.erase(envict_entry.cached_node_.get());
+        LRUEntry &evict_entry = lru_list_.back();
+        size_t remove_n = lru_map_.erase(evict_entry.cached_node_.get());
         if (remove_n != 1) {
             UnrecoverableError("Failed to remove cache entry from lru_map_");
         }
@@ -112,8 +112,8 @@ void CacheResultMap::ResetCacheNumCapacity(size_t cache_num_capacity) {
     std::lock_guard<std::mutex> lock(mtx_);
     cache_num_capacity_ = cache_num_capacity;
     while (lru_list_.size() > cache_num_capacity_) {
-        LRUEntry &envict_entry = lru_list_.back();
-        size_t remove_n = lru_map_.erase(envict_entry.cached_node_.get());
+        LRUEntry &evict_entry = lru_list_.back();
+        size_t remove_n = lru_map_.erase(evict_entry.cached_node_.get());
         if (remove_n != 1) {
             UnrecoverableError("Failed to remove cache entry from lru_map_");
         }
