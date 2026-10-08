@@ -522,8 +522,13 @@ class database_http:
             for col in columns_definition:
                 tmp = {"name": col}
                 for param_name in columns_definition[col]:
+                    if not isinstance(param_name, str):
+                        raise InfinityException(ErrorCode.INVALID_DATA_TYPE,
+                                                f"Invalid column parameter key: {param_name!r} (expected str, got {type(param_name).__name__})")
                     tmp[param_name.lower()] = columns_definition[col][param_name]
                 fields.append(tmp)
+        except InfinityException:
+            raise
         except Exception:
             raise InfinityException(ErrorCode.SYNTAX_ERROR, "http adapter create table parse error")
         # print(fields)
@@ -856,6 +861,14 @@ class table_http:
         return database_result()
 
     def add_columns(self, columns_definition={}):
+        # Validate column-parameter keys BEFORE any network call so that
+        # malformed input surfaces as a typed InfinityException, not a raw
+        # AttributeError from inside the SDK.
+        for col in columns_definition:
+            for param_name in columns_definition[col]:
+                if not isinstance(param_name, str):
+                    raise InfinityException(ErrorCode.INVALID_DATA_TYPE,
+                                            f"Invalid column parameter key: {param_name!r} (expected str, got {type(param_name).__name__})")
         url = f"databases/{self.database_name}/tables/{self.table_name}/columns"
         h = self.net.set_up_header(["accept", "content-type"])
         fields = []
