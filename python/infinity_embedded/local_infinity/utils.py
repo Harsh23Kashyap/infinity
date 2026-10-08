@@ -596,6 +596,9 @@ def get_sparse_type(column_big_info: list[str]) -> WrapDataType:
 def get_data_type(column_info: dict) -> WrapDataType:
     if "type" not in column_info:
         raise InfinityException(ErrorCode.NO_COLUMN_DEFINED, "Column definition without data type")
+    if not isinstance(column_info["type"], str):
+        raise InfinityException(ErrorCode.INVALID_DATA_TYPE,
+                                f"Invalid column type: {column_info['type']!r} (expected str, got {type(column_info['type']).__name__})")
     datatype = column_info["type"].lower()
     column_big_info = [item.strip() for item in datatype.split(",")]
     return get_data_type_from_column_big_info(column_big_info)
