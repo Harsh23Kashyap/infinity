@@ -650,6 +650,9 @@ def get_search_optional_filter_from_opt_params(opt_params: dict):
     optional_filter = None
     k_to_pop = []
     for k, v in opt_params.items():
+        if not isinstance(k, str):
+            raise InfinityException(ErrorCode.INVALID_EXPRESSION,
+                                    f"Invalid knn opt param key: {k!r} (expected str, got {type(k).__name__})")
         if k.lower() == "filter":
             if optional_filter is not None:
                 raise InfinityException(ErrorCode.INVALID_EXPRESSION,
@@ -896,6 +899,9 @@ def get_constraints(column_info: dict) -> list[ttypes.Constraint]:
     res = []
     constraints = column_info["constraints"]
     for constraint in constraints:
+        if not isinstance(constraint, str):
+            raise InfinityException(ErrorCode.INVALID_CONSTRAINT_TYPE,
+                                    f"Invalid constraint: {constraint!r} (expected str, got {type(constraint).__name__})")
         constraint = constraint.lower()
         match constraint:
             case "null":
@@ -1093,6 +1099,9 @@ def get_ordinary_info(column_info_, column_defs, column_name, index):
 
     column_info = {}
     for key, value in column_info_.items():
+        if not isinstance(key, str):
+            raise InfinityException(ErrorCode.INVALID_DATA_TYPE,
+                                    f"Invalid column definition key: {key!r} (expected str, got {type(key).__name__})")
         column_info[key.lower()] = value
 
     proto_column_def.data_type = get_data_type(column_info)
