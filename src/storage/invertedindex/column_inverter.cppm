@@ -81,7 +81,6 @@ public:
 
     const std::vector<std::binary_semaphore *> &semas() const { return semas_; }
 
-    // Release all semaphores exactly once across all threads that process this inverter.
     void ReleaseSemas() {
         bool expected = false;
         if (!semas_released_.compare_exchange_strong(expected, true, std::memory_order_acq_rel)) {
