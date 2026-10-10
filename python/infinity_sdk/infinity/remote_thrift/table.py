@@ -244,6 +244,9 @@ class RemoteTable:
         options.copy_file_type = ttypes.CopyFileType.CSV
         if import_options is not None:
             for k, v in import_options.items():
+                if not isinstance(k, str):
+                    raise InfinityException(ErrorCode.IMPORT_FILE_FORMAT_ERROR,
+                                            f"Invalid import option key: {k!r} (expected str, got {type(k).__name__})")
                 key = k.lower()
                 if key == 'file_type':
                     file_type = v.lower()
@@ -297,6 +300,9 @@ class RemoteTable:
 
         if export_options is not None:
             for k, v in export_options.items():
+                if not isinstance(k, str):
+                    raise InfinityException(ErrorCode.IMPORT_FILE_FORMAT_ERROR,
+                                            f"Invalid export option key: {k!r} (expected str, got {type(k).__name__})")
                 key = k.lower()
                 if key == 'file_type':
                     file_type = v.lower()
