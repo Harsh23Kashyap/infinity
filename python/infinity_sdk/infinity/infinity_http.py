@@ -272,6 +272,8 @@ class infinity_http:
                 d = self.net.set_up_data(["create_option"], {"create_option": opt})
                 r = self.net.request(url, "post", h, d)
                 self.net.raise_exception(r)
+            except InfinityException:
+                raise
             except Exception:
                 raise InfinityException(ErrorCode.INVALID_CONFLICT_TYPE)
             # d = self.net.set_up_data(
@@ -295,6 +297,8 @@ class infinity_http:
                 d = self.net.set_up_data(["drop_option"], {"drop_option": opt})
                 r = self.net.request(url, "delete", h, d)
                 self.net.raise_exception(r)
+            except InfinityException:
+                raise
             except Exception:
                 raise InfinityException(ErrorCode.INVALID_CONFLICT_TYPE)
 
@@ -305,6 +309,8 @@ class infinity_http:
         try:
             self.net.raise_exception(r)
             return database_http(self.net, database_name=r.json()["database_name"])
+        except InfinityException:
+            raise
         except Exception:
             raise InfinityException(ErrorCode.DB_NOT_EXIST)
 
@@ -524,6 +530,8 @@ class database_http:
                 for param_name in columns_definition[col]:
                     tmp[param_name.lower()] = columns_definition[col][param_name]
                 fields.append(tmp)
+        except InfinityException:
+            raise
         except Exception:
             raise InfinityException(ErrorCode.SYNTAX_ERROR, "http adapter create table parse error")
         # print(fields)

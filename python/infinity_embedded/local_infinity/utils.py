@@ -244,6 +244,8 @@ def traverse_conditions(cons, fn=None):
 def parse_expr(expr):
     try:
         return traverse_conditions(expr, parse_expr)
+    except InfinityException:
+        raise
     except Exception:
         if isinstance(expr, exp.Star):
             column_expr = WrapColumnExpr()
