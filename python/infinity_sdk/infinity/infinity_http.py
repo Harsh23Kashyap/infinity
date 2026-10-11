@@ -688,6 +688,8 @@ class table_http:
         create_index_info["type"] = index_type_transfrom[index_info.index_type.value]
         if index_info.params is not None:
             for key, value in index_info.params.items():
+                if not isinstance(key, str):
+                    raise InfinityException(ErrorCode.INVALID_INDEX_PARAM, f"Invalid index param key: {key!r} (expected str, got {type(key).__name__})")
                 if not isinstance(value, str):
                     raise InfinityException(ErrorCode.INVALID_INDEX_PARAM, f"parameter value: {value} isn't string")
                 create_index_info[key] = value
