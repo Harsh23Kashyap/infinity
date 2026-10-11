@@ -102,6 +102,8 @@ class IndexInfo:
         init_params_list = []
         if self.params is not None:
             for key, value in self.params.items():
+                if not isinstance(key, str):
+                    raise InfinityException(ErrorCode.INVALID_INDEX_PARAM, f"Invalid index param key: {key!r} (expected str, got {type(key).__name__})")
                 if isinstance(value, str):
                     init_params_list.append(ttypes.InitParameter(key, value))
                 else:
